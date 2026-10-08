@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       WP MCP
  * Description:       Turns this WordPress site into its own remote MCP server so Claude, Gemini or any MCP client can manage pages, posts, custom post types, media, taxonomies and Elementor layouts.
- * Version:           2.3.0
+ * Version:           2.4.0
  * Author:            Saifullah Qadeer
  * License:           GPL-2.0-or-later
  * Text Domain:       wp-mcp
@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // No direct access.
 }
 
-define( 'WPMCP_VERSION', '2.3.0' );
+define( 'WPMCP_VERSION', '2.4.0' );
 define( 'WPMCP_NAMESPACE', 'wpmcp/v1' );
 define( 'WPMCP_PLUGIN_FILE', __FILE__ );
 define( 'WPMCP_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
