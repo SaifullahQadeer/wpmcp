@@ -3,7 +3,7 @@ Author: Saifullah Qadeer
 Requires at least: 5.6
 Requires PHP: 7.4
 Tested with Elementor: 4.x
-Stable tag: 2.12.0
+Stable tag: 2.12.1
 License: GPL-2.0-or-later
 
 Turns a WordPress site into its own remote MCP server, so Claude (web, Desktop,
@@ -212,6 +212,9 @@ The admin screen bundles the Inter typeface (SIL Open Font License 1.1, see
 assets/fonts/Inter-LICENSE.txt). Nothing is loaded from external servers.
 
 == Changelog ==
+
+= 2.12.1 =
+* Sign-in discovery and token responses are now marked uncacheable for LiteSpeed and other page caches. LiteSpeed had been keeping the discovery data for a week, which could leave a connector with stale sign-in details.
 
 = 2.12.0 =
 * Advanced Custom Fields support, for the free plugin and ACF Pro: create and update custom post types, taxonomies and field groups, and read and write field values, through ACF's own functions. Seven new tools (38 in total).

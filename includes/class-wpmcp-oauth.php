@@ -73,7 +73,7 @@ class WPMCP_OAuth {
 		if ( preg_match( '#/\.well-known/oauth-authorization-server(?:/|$)#', $path ) ) { $doc = self::server_metadata(); }
 		elseif ( preg_match( '#/\.well-known/oauth-protected-resource(?:/|$)#', $path ) ) { $doc = self::resource_metadata(); }
 		else { return; }
-		nocache_headers();
+		self::no_cache();
 		header( 'Access-Control-Allow-Origin: *' );
 		wp_send_json( $doc );
 	}
@@ -117,10 +117,20 @@ class WPMCP_OAuth {
 	}
 
 	private static function json( $status, $data ) {
+		self::no_cache();
 		$response = new WP_REST_Response( $data, $status );
 		$response->header( 'Cache-Control', 'no-store' );
 		$response->header( 'Pragma', 'no-cache' );
+		$response->header( 'X-LiteSpeed-Cache-Control', 'no-cache' ); // LiteSpeed ignores Cache-Control on REST responses and kept discovery data for a week.
 		return $response;
+	}
+
+	/** Sign-in responses are never stored by a page cache: they depend on who asks and when. */
+	private static function no_cache() {
+		if ( ! defined( 'DONOTCACHEPAGE' ) ) { define( 'DONOTCACHEPAGE', true ); } // WP Rocket, W3 Total Cache, WP Super Cache and others honour this.
+		do_action( 'litespeed_control_set_nocache', 'WP MCP sign-in' );
+		nocache_headers();
+		if ( ! headers_sent() ) { header( 'X-LiteSpeed-Cache-Control: no-cache' ); }
 	}
 
 	private static function oauth_error( $status, $code, $description ) {
