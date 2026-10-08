@@ -3,7 +3,7 @@ Author: Saifullah Qadeer
 Requires at least: 5.6
 Requires PHP: 7.4
 Tested with Elementor: 4.x
-Stable tag: 2.11.0
+Stable tag: 2.11.1
 License: GPL-2.0-or-later
 
 Turns a WordPress site into its own remote MCP server, so Claude (web, Desktop,
@@ -192,6 +192,10 @@ The admin screen bundles the Inter typeface (SIL Open Font License 1.1, see
 assets/fonts/Inter-LICENSE.txt). Nothing is loaded from external servers.
 
 == Changelog ==
+
+= 2.11.1 =
+* Fixed: in the Security tab the API key field and the key-in-URL showed "full" instead of the key (the access level picker reused the same variable). The stored key was never changed; it is shown correctly again. If you copied the key from 2.11.0, copy it again.
+* No focus outline is left on icon buttons after a mouse click.
 
 = 2.11.0 =
 * Access levels for connected apps: Read only, Read and edit, or Full access. Choose one when you approve an app (Read and edit is preselected) and change it any time in Connected apps; it applies on the app's next request.

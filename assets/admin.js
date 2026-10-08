@@ -26,6 +26,8 @@ document.addEventListener('click', async (event) => {
     event.preventDefault();
     return;
   }
+  // A mouse click leaves no focus outline; keyboard use keeps it.
+  if (event.detail > 0 && (button.classList.contains('wpmcp-icon-btn') || button.classList.contains('wpmcp-tool'))) button.blur();
   if (button.dataset.tool) {
     document.querySelectorAll('.wpmcp-tool').forEach((tool) => {
       tool.setAttribute('aria-pressed', String(tool === button));
