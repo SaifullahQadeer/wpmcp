@@ -80,6 +80,10 @@ class WPMCP_Admin {
 		$name   = 'wordpress';
 		$cursor = 'cursor://anysphere.cursor-deeplink/mcp/install?name=' . rawurlencode( $name ) . '&config=' . rawurlencode( base64_encode( wp_json_encode( array( 'url' => $url ) ) ) );
 		$vscode = 'vscode:mcp/install?' . rawurlencode( wp_json_encode( array( 'name' => $name, 'type' => 'http', 'url' => $url ) ) );
+		$label_name   = rawurlencode( get_bloginfo( 'name' ) . ' (WP MCP)' );
+		$claude_query = '?modal=add-custom-connector&connectorName=' . $label_name . '&connectorUrl=' . rawurlencode( $url );
+		$claude       = 'https://claude.ai/customize/connectors' . $claude_query; // Documented install link: Anthropic "Directory connectors vs custom connectors".
+		$claude_admin = 'https://claude.ai/admin-settings/connectors' . $claude_query;
 		$tools  = array(
 			'claude'  => 'Claude',
 			'chatgpt' => 'ChatGPT',
@@ -94,11 +98,11 @@ class WPMCP_Admin {
 		<div class="wpmcp-tools" role="group" aria-label="AI app">
 			<?php foreach ( $tools as $id => $label ) : ?><button type="button" class="wpmcp-tool" data-tool="<?php echo esc_attr( $id ); ?>" aria-pressed="<?php echo 'claude' === $id ? 'true' : 'false'; ?>"><?php echo esc_html( $label ); ?></button><?php endforeach; ?>
 		</div>
-		<?php $this->field( 'wpmcp-endpoint', 'Server URL', $url ); ?>
 
 		<div class="wpmcp-steps" data-steps="claude">
-			<p><button type="button" class="button button-primary" data-copy-open="wpmcp-endpoint" data-open="https://claude.ai/settings/connectors">Copy URL and open Claude</button></p>
-			<ol><li>Click <strong>Add custom connector</strong> and paste the URL. Leave any client ID or secret empty.</li><li>Click <strong>Connect</strong>. This site opens a page asking you to approve.</li><li>Click <strong>Approve</strong>, then ask Claude to run <code>wp_ping</code>.</li></ol>
+			<p><a class="button button-primary button-hero" href="<?php echo esc_url( $claude ); ?>" target="_blank" rel="noopener">Connect with Claude</a></p>
+			<p>Claude opens with this site already filled in. Confirm it, click <strong>Connect</strong>, then <strong>Approve</strong> on the page this site shows. Works for claude.ai and Claude Desktop.</p>
+			<p class="description">On a Claude Team or Enterprise plan? An organization owner adds it <a href="<?php echo esc_url( $claude_admin ); ?>" target="_blank" rel="noopener">here</a>, then members click Connect.</p>
 		</div>
 		<div class="wpmcp-steps" data-steps="chatgpt" hidden>
 			<p><button type="button" class="button button-primary" data-copy-open="wpmcp-endpoint" data-open="https://chatgpt.com/">Copy URL and open ChatGPT</button></p>
@@ -122,6 +126,7 @@ class WPMCP_Admin {
 			<p><button type="button" class="button button-primary" data-copy-open="wpmcp-endpoint">Copy URL</button></p>
 			<ol><li>Add the URL as a remote MCP server or custom connector, with OAuth sign-in if the app asks.</li><li>Click <strong>Approve</strong> on the page this site opens.</li><li>If the app cannot sign in, use an API key under Advanced below.</li></ol>
 		</div>
+		<details class="wpmcp-manual"><summary>Manual setup: show the server URL</summary><?php $this->field( 'wpmcp-endpoint', 'Server URL', $url ); ?></details>
 		<?php if ( ! WPMCP_OAuth::enabled() ) : ?><div class="notice notice-warning inline"><p>OAuth sign-in is off<?php echo 'https' !== wp_parse_url( home_url(), PHP_URL_SCHEME ) ? ' because this site is not on HTTPS' : ''; ?>. Turn it on under Access &amp; permissions, or connect with an API key under Advanced.</p></div><?php endif; ?>
 		</section>
 		<?php
