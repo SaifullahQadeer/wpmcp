@@ -3,7 +3,7 @@ Author: Saifullah Qadeer
 Requires at least: 5.6
 Requires PHP: 7.4
 Tested with Elementor: 4.x
-Stable tag: 2.6.2
+Stable tag: 2.7.0
 License: GPL-2.0-or-later
 
 Turns a WordPress site into its own remote MCP server, so Claude (web, Desktop,
@@ -126,6 +126,11 @@ wp_set_elementor also accepts "page_settings" for _elementor_page_settings, on
 its own or alongside elements.
 
 == Changelog ==
+
+= 2.7.0 =
+* Redesigned admin screen with four tabs: Connect (status tiles, connect an app, connected apps), Tools (all 20 tools with access level and whether each is on), Security (access switches, API key, built-in protection) and System (version and update check, site details, endpoints, file safety and recovery).
+* The sidebar panels and long sections were removed from the main screen. Settings forms return to the tab they were saved from.
+* The header shows when an update is available.
 
 = 2.6.2 =
 * After you click Connect with Claude, the WP MCP page watches for the connection to finish, tries to close the Claude tab it opened, and reloads with a Claude is connected notice and the Connected apps list updated.

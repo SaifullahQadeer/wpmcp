@@ -65,6 +65,12 @@ class WPMCP_Updater {
 		return $release;
 	}
 
+	/** Newer version already found by an earlier check, or ''. Never makes a network request. */
+	public function cached_update() {
+		$cached = get_site_transient( self::CACHE );
+		return is_array( $cached ) && ! empty( $cached['version'] ) && version_compare( $cached['version'], WPMCP_VERSION, '>' ) ? $cached['version'] : '';
+	}
+
 	/**
 	 * Look up the latest release now, ignoring the cache, and refresh WordPress's update list.
 	 *
