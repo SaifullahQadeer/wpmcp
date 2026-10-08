@@ -3,7 +3,7 @@ Author: Saifullah Qadeer
 Requires at least: 5.6
 Requires PHP: 7.4
 Tested with Elementor: 4.x
-Stable tag: 2.5.0
+Stable tag: 2.6.0
 License: GPL-2.0-or-later
 
 Turns a WordPress site into its own remote MCP server, so Claude (web, Desktop,
@@ -126,6 +126,12 @@ wp_set_elementor also accepts "page_settings" for _elementor_page_settings, on
 its own or alongside elements.
 
 == Changelog ==
+
+= 2.6.0 =
+* New connect screen: pick your AI app (Claude, ChatGPT, Claude Code, Cursor, VS Code or other) and follow one-click steps. Copy-and-open for Claude and ChatGPT, a ready command for Claude Code, Add to Cursor and Add to VS Code links.
+* Connected apps list with a Revoke button that cuts access immediately.
+* Setting to turn OAuth sign-in on or off. The API key moved under Advanced.
+* Consent page recognizes Cursor and VS Code return addresses.
 
 = 2.5.0 =
 * Sign in with OAuth: add the server URL as a connector, click Connect and approve in wp-admin. No API key to copy. Administrators approve; the app acts as that administrator.

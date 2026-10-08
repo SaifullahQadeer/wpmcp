@@ -241,11 +241,19 @@ class WPMCP_OAuth {
 		return $out;
 	}
 
+	/** True when the return address belongs to an app people commonly connect from. */
+	public static function is_known_redirect( $uri ) {
+		$parts = wp_parse_url( (string) $uri );
+		if ( ! $parts || empty( $parts['scheme'] ) ) { return false; }
+		if ( in_array( strtolower( $parts['scheme'] ), array( 'cursor', 'vscode', 'vscode-insiders' ), true ) ) { return true; }
+		return ! empty( $parts['host'] ) && self::is_known_host( $parts['host'] );
+	}
+
 	/** Hosts of AI apps people commonly connect from, plus this machine for local tools. */
 	public static function is_known_host( $host ) {
 		$host = strtolower( $host );
 		if ( in_array( $host, array( '127.0.0.1', 'localhost', '[::1]', '::1' ), true ) ) { return true; }
-		foreach ( (array) apply_filters( 'wpmcp_known_oauth_hosts', array( 'claude.ai', 'claude.com', 'anthropic.com', 'chatgpt.com', 'openai.com', 'cursor.com', 'cursor.sh', 'perplexity.ai', 'mistral.ai' ) ) as $known ) {
+		foreach ( (array) apply_filters( 'wpmcp_known_oauth_hosts', array( 'claude.ai', 'claude.com', 'anthropic.com', 'chatgpt.com', 'openai.com', 'cursor.com', 'cursor.sh', 'vscode.dev', 'perplexity.ai', 'mistral.ai' ) ) as $known ) {
 			if ( $host === $known || ( strlen( $host ) > strlen( $known ) && '.' . $known === substr( $host, -strlen( $known ) - 1 ) ) ) { return true; }
 		}
 		return false;
@@ -315,10 +323,10 @@ class WPMCP_OAuth {
 			<p style="font-size:15px"><strong><?php echo esc_html( $checked['client']['name'] ); ?></strong> wants to connect to this site.</p>
 			<p>It will be able to read and change <strong>pages, posts, media, categories and Elementor layouts</strong> as <strong><?php echo esc_html( $user->display_name ); ?></strong>.
 			<?php if ( '1' === (string) get_option( 'wpmcp_extensions_enabled', '0' ) ) : ?>Plugin and theme tools are also available because you enabled them in WP MCP.<?php endif; ?></p>
-			<?php if ( ! self::is_known_host( (string) $host ) ) : ?>
+			<?php if ( ! self::is_known_redirect( $checked['redirect_uri'] ) ) : ?>
 				<div class="notice notice-warning inline"><p><strong>Unrecognized app.</strong> It will send you to <code><?php echo esc_html( $host ? $host : $checked['redirect_uri'] ); ?></code>, which is not a well-known AI service. Anyone can register an app under any name, so approve only if you started this connection yourself.</p></div>
 			<?php else : ?>
-				<p class="description">The app returns you to <code><?php echo esc_html( $host ); ?></code>. The name above is chosen by the app itself. Only approve if you just started this connection.</p>
+				<p class="description">The app returns you to <code><?php echo esc_html( $host ? $host : wp_parse_url( $checked['redirect_uri'], PHP_URL_SCHEME ) . '://' ); ?></code>. The name above is chosen by the app itself. Only approve if you just started this connection.</p>
 			<?php endif; ?>
 			<form method="post" action="<?php echo esc_url( add_query_arg( 'page', self::PAGE, admin_url( 'admin.php' ) ) ); ?>">
 				<?php wp_nonce_field( 'wpmcp_authorize' ); ?>

@@ -49,13 +49,16 @@ class WPMCP_Admin {
 			update_option( 'wpmcp_api_key', WPMCP_Auth::generate_key(), false );
 			$message = 'Key rotated. Update the key in each connected client.';
 		} elseif ( 'save' === $action ) {
-			foreach ( array( 'enabled', 'allow_url_key', 'extensions_enabled', 'allow_install', 'allow_edit' ) as $setting ) {
+			foreach ( array( 'enabled', 'oauth_enabled', 'allow_url_key', 'extensions_enabled', 'allow_install', 'allow_edit' ) as $setting ) {
 				$value = isset( $_POST[ 'wpmcp_' . $setting ] ) ? '1' : '0';
 				if ( is_multisite() && in_array( $setting, array( 'extensions_enabled', 'allow_install', 'allow_edit' ), true ) ) { $value = '0'; }
 				update_option( 'wpmcp_' . $setting, $value );
 			}
 			update_option( 'wpmcp_extension_owner', get_current_user_id() );
 			$message = 'Connection and permissions saved.';
+		} elseif ( 'revoke' === $action ) {
+			$grant   = isset( $_POST['wpmcp_grant'] ) ? sanitize_key( wp_unslash( $_POST['wpmcp_grant'] ) ) : '';
+			$message = WPMCP_OAuth::revoke_grant( $grant ) ? 'App disconnected. Its access stopped immediately.' : 'That connection was already removed.';
 		} else { return; }
 		set_transient( 'wpmcp_notice_' . get_current_user_id(), $message, 60 );
 		wp_safe_redirect( admin_url( 'admin.php?page=wp-mcp' ) );
@@ -72,6 +75,73 @@ class WPMCP_Admin {
 	private function toggle( $key, $title, $description, $default = '0' ) {
 		?><label class="wpmcp-toggle"><input type="checkbox" name="wpmcp_<?php echo esc_attr( $key ); ?>" value="1" <?php checked( '1', get_option( 'wpmcp_' . $key, $default ) ); ?> /><span><strong><?php echo esc_html( $title ); ?></strong><small><?php echo esc_html( $description ); ?></small></span></label><?php
 	}
+	/** Tool picker: choose an AI app, then follow its one-click steps. */
+	private function render_connect( $url ) {
+		$name   = 'wordpress';
+		$cursor = 'cursor://anysphere.cursor-deeplink/mcp/install?name=' . rawurlencode( $name ) . '&config=' . rawurlencode( base64_encode( wp_json_encode( array( 'url' => $url ) ) ) );
+		$vscode = 'vscode:mcp/install?' . rawurlencode( wp_json_encode( array( 'name' => $name, 'type' => 'http', 'url' => $url ) ) );
+		$tools  = array(
+			'claude'  => 'Claude',
+			'chatgpt' => 'ChatGPT',
+			'code'    => 'Claude Code',
+			'cursor'  => 'Cursor',
+			'vscode'  => 'VS Code',
+			'other'   => 'Other app',
+		);
+		$protocols = array( 'https', 'cursor', 'vscode' );
+		?>
+		<section class="wpmcp-panel"><h2>Connect your AI app</h2><p>Pick your app. You approve the connection on this site, so there is no key to copy.</p>
+		<div class="wpmcp-tools" role="group" aria-label="AI app">
+			<?php foreach ( $tools as $id => $label ) : ?><button type="button" class="wpmcp-tool" data-tool="<?php echo esc_attr( $id ); ?>" aria-pressed="<?php echo 'claude' === $id ? 'true' : 'false'; ?>"><?php echo esc_html( $label ); ?></button><?php endforeach; ?>
+		</div>
+		<?php $this->field( 'wpmcp-endpoint', 'Server URL', $url ); ?>
+
+		<div class="wpmcp-steps" data-steps="claude">
+			<p><button type="button" class="button button-primary" data-copy-open="wpmcp-endpoint" data-open="https://claude.ai/settings/connectors">Copy URL and open Claude</button></p>
+			<ol><li>Click <strong>Add custom connector</strong> and paste the URL. Leave any client ID or secret empty.</li><li>Click <strong>Connect</strong>. This site opens a page asking you to approve.</li><li>Click <strong>Approve</strong>, then ask Claude to run <code>wp_ping</code>.</li></ol>
+		</div>
+		<div class="wpmcp-steps" data-steps="chatgpt" hidden>
+			<p><button type="button" class="button button-primary" data-copy-open="wpmcp-endpoint" data-open="https://chatgpt.com/">Copy URL and open ChatGPT</button></p>
+			<ol><li>Open <strong>Settings → Connectors</strong>. Custom connectors may need <strong>Developer mode</strong> under Advanced. Menu names change between versions.</li><li>Create a connector, paste the URL and choose OAuth.</li><li>Click <strong>Approve</strong> on the page this site opens.</li></ol>
+		</div>
+		<div class="wpmcp-steps" data-steps="code" hidden>
+			<?php $this->field( 'wpmcp-cmd', 'Run this in your terminal', 'claude mcp add --transport http ' . $name . ' ' . $url ); ?>
+			<ol><li>In Claude Code run <code>/mcp</code>, choose <strong><?php echo esc_html( $name ); ?></strong> and select <strong>Authenticate</strong>.</li><li>Click <strong>Approve</strong> on the page this site opens.</li></ol>
+		</div>
+		<div class="wpmcp-steps" data-steps="cursor" hidden>
+			<p><a class="button button-primary" href="<?php echo esc_url( $cursor, $protocols ); ?>">Add to Cursor</a></p>
+			<ol><li>Cursor asks to install the server. Confirm.</li><li>Choose <strong>Connect</strong> on the server, then <strong>Approve</strong> on the page this site opens.</li></ol>
+			<p class="description">If nothing opens, add the Server URL above as a remote server in Cursor’s MCP settings.</p>
+		</div>
+		<div class="wpmcp-steps" data-steps="vscode" hidden>
+			<p><a class="button button-primary" href="<?php echo esc_url( $vscode, $protocols ); ?>">Add to VS Code</a></p>
+			<ol><li>VS Code asks to install the server. Confirm.</li><li>Start the server (<strong>MCP: List Servers</strong>), sign in, then <strong>Approve</strong> on the page this site opens.</li></ol>
+			<p class="description">If nothing opens, add the Server URL above as an HTTP server in <code>mcp.json</code>.</p>
+		</div>
+		<div class="wpmcp-steps" data-steps="other" hidden>
+			<p><button type="button" class="button button-primary" data-copy-open="wpmcp-endpoint">Copy URL</button></p>
+			<ol><li>Add the URL as a remote MCP server or custom connector, with OAuth sign-in if the app asks.</li><li>Click <strong>Approve</strong> on the page this site opens.</li><li>If the app cannot sign in, use an API key under Advanced below.</li></ol>
+		</div>
+		<?php if ( ! WPMCP_OAuth::enabled() ) : ?><div class="notice notice-warning inline"><p>OAuth sign-in is off<?php echo 'https' !== wp_parse_url( home_url(), PHP_URL_SCHEME ) ? ' because this site is not on HTTPS' : ''; ?>. Turn it on under Access &amp; permissions, or connect with an API key under Advanced.</p></div><?php endif; ?>
+		</section>
+		<?php
+	}
+
+	/** Apps that are connected through OAuth, with a Revoke button each. */
+	private function render_connected() {
+		$grants = WPMCP_OAuth::list_grants();
+		?>
+		<section class="wpmcp-panel"><h2>Connected apps</h2>
+		<?php if ( ! $grants ) : ?><p>No apps connected yet. After you approve a connection it appears here.</p><?php else : ?>
+		<table class="widefat striped wpmcp-table"><thead><tr><th>App</th><th>Acts as</th><th>Connected</th><th>Last used</th><th></th></tr></thead><tbody>
+		<?php foreach ( $grants as $id => $g ) : $user = get_userdata( (int) $g['user_id'] ); ?>
+			<tr><td><?php echo esc_html( $g['client_name'] ); ?></td><td><?php echo esc_html( $user ? $user->display_name : 'Unknown user' ); ?></td><td><?php echo esc_html( wp_date( get_option( 'date_format' ), (int) $g['created'] ) ); ?></td><td><?php echo esc_html( human_time_diff( (int) $g['last_used'] ) . ' ago' ); ?></td>
+			<td><form method="post"><?php wp_nonce_field( 'wpmcp_settings' ); ?><input type="hidden" name="wpmcp_action" value="revoke" /><input type="hidden" name="wpmcp_grant" value="<?php echo esc_attr( $id ); ?>" /><button class="button" data-confirm="Disconnect this app? It stops working immediately.">Revoke</button></form></td></tr>
+		<?php endforeach; ?></tbody></table>
+		<?php endif; ?>
+		</section>
+		<?php
+	}
 	public function render_page() {
 		if ( ! current_user_can( 'manage_options' ) ) { return; }
 		$key = (string) get_option( 'wpmcp_api_key', '' );
@@ -87,17 +157,16 @@ class WPMCP_Admin {
 		<?php if ( ! is_ssl() ) : ?><div class="notice notice-warning"><p>Configure HTTPS before connecting. Extension tools require a secure request.</p></div><?php endif; ?>
 		<?php if ( ! get_option( 'permalink_structure' ) ) : ?><div class="notice notice-warning"><p>Enable pretty permalinks before using a key in the URL.</p></div><?php endif; ?>
 		<div class="wpmcp-layout"><main>
-		<section class="wpmcp-panel"><h2>Connect your assistant</h2><p>Add the server URL below as a custom connector in your AI app (in Claude: Settings → Connectors → Add custom connector), then click Connect and approve on the page that opens. Leave any client ID or secret fields empty. No key is needed.</p>
-		<?php $this->field( 'wpmcp-endpoint', 'Server URL', $url ); ?>
-		<div class="wpmcp-instruction"><strong>Advanced: connect with an API key instead</strong><p>For apps that cannot sign in, set the header name to <code>x-api-key</code> and paste the API key below as its value. Choose “No sign-in” if your client asks for an OAuth method.</p></div>
+		<?php $this->render_connect( $url ); $this->render_connected(); ?>
+		<section class="wpmcp-panel"><h2>Advanced: connect with an API key</h2><p>Only for apps that cannot sign in with OAuth. Anyone with this key can use the enabled tools.</p>
+		<details><summary>Show API key options</summary>
+		<div class="wpmcp-instruction"><strong>Request header</strong><p>Set the header name to <code>x-api-key</code> and paste the key below as its value. Choose “No sign-in” if your client asks for an OAuth method. Or send <code>Authorization: Bearer YOUR_API_KEY</code>.</p></div>
 		<?php $this->field( 'wpmcp-key', 'API key', $key, true ); ?>
-		<p class="description">Alternatively, send <code>Authorization: Bearer YOUR_API_KEY</code>. Anyone with this key can use enabled tools.</p>
 		<form method="post" class="wpmcp-rotate"><?php wp_nonce_field( 'wpmcp_settings' ); ?><input type="hidden" name="wpmcp_action" value="regenerate" /><button class="button" data-confirm="Rotate the key? Connected clients will need the new key.">Rotate API key</button></form>
-		<details><summary>Connect a client that cannot send headers</summary><p>For content tools only. Enable URL authentication below.</p><?php $this->field( 'wpmcp-url-key', 'URL containing your key', rest_url( WPMCP_NAMESPACE . '/mcp/' . $key ), true ); ?></details>
-		<div class="wpmcp-tip">After connecting, ask your assistant to run <code>wp_ping</code> to verify access.</div></section>
+		<p><strong>A client that cannot send headers</strong> can use this URL (content tools only; enable URL keys below).</p><?php $this->field( 'wpmcp-url-key', 'URL containing your key', rest_url( WPMCP_NAMESPACE . '/mcp/' . $key ), true ); ?></details></section>
 		<form method="post"><input type="hidden" name="wpmcp_action" value="save" /><?php wp_nonce_field( 'wpmcp_settings' ); ?>
-		<section class="wpmcp-panel"><h2>Access & permissions</h2><p>Changes apply to every client using this API key.</p>
-		<?php $this->toggle( 'enabled', 'Enable MCP server', 'Allow authenticated clients to use this site’s tools.', '1' ); $this->toggle( 'allow_url_key', 'Allow API keys in URLs', 'Compatibility for clients without headers. Headers keep keys out of URL logs.', '1' ); ?>
+		<section class="wpmcp-panel"><h2>Access & permissions</h2><p>Changes apply to every connected app and API key.</p>
+		<?php $this->toggle( 'enabled', 'Enable MCP server', 'Allow authenticated clients to use this site’s tools.', '1' ); $this->toggle( 'oauth_enabled', 'Allow sign-in with OAuth', 'Lets AI apps connect with a Connect button and your approval, with no key to copy. Requires HTTPS.', '1' ); $this->toggle( 'allow_url_key', 'Allow API keys in URLs', 'Compatibility for clients without headers. Headers keep keys out of URL logs.', '1' ); ?>
 		<h3>Plugins & themes</h3><p>Extension access uses the WordPress permissions of the administrator who saves these settings. HTTPS and header authentication are required. Multisite is not supported.</p>
 		<?php $this->toggle( 'extensions_enabled', 'Allow extension access', 'List installed plugins and themes and read their editable files.' ); $this->toggle( 'allow_install', 'Allow installation', 'Install from WordPress.org. Installed extensions remain inactive.' ); $this->toggle( 'allow_edit', 'Allow code editing', 'Edit existing source files. Changes can break the site; use a backup or staging site.' ); ?>
 		<div class="wpmcp-save"><button class="button button-primary button-hero">Save settings</button><span>Installation and editing also require extension access.</span></div></section></form>
