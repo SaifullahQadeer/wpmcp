@@ -127,6 +127,9 @@ its own or alongside elements.
 
 == Changelog ==
 
+= Unreleased =
+* Check for updates link on the Plugins screen looks up the latest GitHub release immediately.
+
 = 2.4.1 =
 * Update checks refresh hourly, and Dashboard > Updates > Check Again bypasses the cache.
 

@@ -6,13 +6,34 @@ class WPMCP_Admin {
 		add_action( 'admin_menu', array( $this, 'add_menu' ) );
 		add_action( 'admin_init', array( $this, 'handle_actions' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'assets' ) );
+		add_action( 'admin_init', array( $this, 'handle_update_check' ) );
+		add_action( 'admin_notices', array( $this, 'update_notice' ) );
 		add_filter( 'plugin_action_links_' . plugin_basename( WPMCP_PLUGIN_FILE ), array( $this, 'action_links' ) );
+	}
+	/** "Check for updates" link on the Plugins screen: look up the latest GitHub release now. */
+	public function handle_update_check() {
+		if ( ! isset( $_GET['wpmcp_check_update'] ) || ! current_user_can( 'update_plugins' ) ) { return; }
+		check_admin_referer( 'wpmcp_check_update' );
+		$found = ( new WPMCP_Updater() )->check_now();
+		wp_safe_redirect( add_query_arg( array( 'wpmcp_update_result' => $found['result'], 'wpmcp_update_version' => rawurlencode( $found['version'] ) ), admin_url( 'plugins.php' ) ) );
+		exit;
+	}
+	public function update_notice() {
+		if ( ! isset( $_GET['wpmcp_update_result'] ) || ! current_user_can( 'update_plugins' ) ) { return; }
+		$version = isset( $_GET['wpmcp_update_version'] ) ? preg_replace( '/[^0-9A-Za-z.-]/', '', wp_unslash( $_GET['wpmcp_update_version'] ) ) : '';
+		$result  = sanitize_key( wp_unslash( $_GET['wpmcp_update_result'] ) );
+		if ( 'available' === $result ) { $class = 'notice-warning'; $text = 'WP MCP ' . $version . ' is available. Use the Update now link on the WP MCP row below.'; }
+		elseif ( 'current' === $result ) { $class = 'notice-success'; $text = 'WP MCP is up to date (version ' . $version . ').'; }
+		else { $class = 'notice-error'; $text = 'Could not reach GitHub to check for updates. Try again in a few minutes.'; }
+		echo '<div class="notice ' . esc_attr( $class ) . ' is-dismissible"><p>' . esc_html( $text ) . '</p></div>';
 	}
 	public function add_menu() { add_menu_page( 'WP MCP', 'WP MCP', 'manage_options', 'wp-mcp', array( $this, 'render_page' ), 'dashicons-rest-api', 80 ); }
 	/** Put a Settings link before Deactivate on the Plugins screen. */
 	public function action_links( $links ) {
 		if ( ! current_user_can( 'manage_options' ) ) { return $links; }
+		$check = current_user_can( 'update_plugins' ) ? '<a href="' . esc_url( wp_nonce_url( admin_url( 'plugins.php?wpmcp_check_update=1' ), 'wpmcp_check_update' ) ) . '">Check for updates</a>' : '';
 		array_unshift( $links, '<a href="' . esc_url( admin_url( 'admin.php?page=wp-mcp' ) ) . '">Settings</a>' );
+		if ( $check ) { array_splice( $links, 1, 0, $check ); }
 		return $links;
 	}
 	public function assets( $hook ) {

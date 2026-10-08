@@ -65,6 +65,21 @@ class WPMCP_Updater {
 		return $release;
 	}
 
+	/**
+	 * Look up the latest release now, ignoring the cache, and refresh WordPress's update list.
+	 *
+	 * @return array{result:string,version:string} result is available, current or error.
+	 */
+	public function check_now() {
+		delete_site_transient( self::CACHE );
+		$release = $this->release();
+		if ( ! $release ) { return array( 'result' => 'error', 'version' => '' ); }
+		if ( ! version_compare( $release['version'], WPMCP_VERSION, '>' ) ) { return array( 'result' => 'current', 'version' => WPMCP_VERSION ); }
+		delete_site_transient( 'update_plugins' );
+		wp_update_plugins();
+		return array( 'result' => 'available', 'version' => $release['version'] );
+	}
+
 	public function inject_update( $transient ) {
 		if ( ! is_object( $transient ) ) { return $transient; }
 		$release = $this->release();
