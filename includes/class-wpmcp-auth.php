@@ -93,7 +93,7 @@ class WPMCP_Auth {
 			return new WP_Error(
 				'wpmcp_missing_key',
 				'Missing API key. Send it in the x-api-key header (or Authorization: Bearer).',
-				array( 'status' => 401 )
+				array( 'status' => 403 )
 			);
 		}
 
@@ -101,7 +101,7 @@ class WPMCP_Auth {
 			return new WP_Error(
 				'wpmcp_bad_key',
 				'Invalid API key.',
-				array( 'status' => 401 )
+				array( 'status' => 403 )
 			);
 		}
 
