@@ -30,6 +30,7 @@ if ( ! defined( 'WPMCP_MAX_RESULT_CHARS' ) ) {
 }
 
 require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-auth.php';
+require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-oauth.php';
 require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-file-safety.php';
 require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-extensions.php';
 require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-elementor.php';
@@ -63,6 +64,7 @@ register_activation_hook( __FILE__, 'wpmcp_activate' );
 function wpmcp_init() {
 	( new WPMCP_REST() )->register_hooks();
 	( new WPMCP_MCP() )->register_hooks();
+	WPMCP_OAuth::register_hooks();
 	( new WPMCP_Updater() )->register_hooks(); // Not admin-only: scheduled update checks run in cron.
 	if ( is_admin() ) {
 		( new WPMCP_Admin() )->register_hooks();

@@ -77,8 +77,22 @@ class WPMCP_Auth {
 			);
 		}
 
+		$provided = self::get_request_key( $request );
+
+		// OAuth access token: acts as the administrator who approved the connection.
+		if ( 0 === strpos( $provided, 'wpmcp_at_' ) ) {
+			$grant = WPMCP_OAuth::validate_access_token( $provided );
+			if ( ! $grant ) {
+				WPMCP_OAuth::send_challenge( 'invalid_token' );
+				return new WP_Error( 'wpmcp_invalid_token', 'The access token is invalid or has expired.', array( 'status' => 401 ) );
+			}
+			wp_set_current_user( $grant['user_id'] );
+			self::$header_authenticated = true;
+			return true;
+		}
+
 		$stored = (string) get_option( 'wpmcp_api_key', '' );
-		if ( '' === $stored ) {
+		if ( '' === $stored && ! WPMCP_OAuth::enabled() ) {
 			return new WP_Error(
 				'wpmcp_no_key',
 				'No API key configured on the site. Open the WP MCP admin menu and generate one.',
@@ -86,18 +100,26 @@ class WPMCP_Auth {
 			);
 		}
 
-		$provided = self::get_request_key( $request );
 		$from_header = '' !== $provided;
 		if ( ! $from_header && '1' === (string) get_option( 'wpmcp_allow_url_key', '1' ) ) {
 			$params = $request->get_url_params();
 			$provided = isset( $params['key'] ) && is_string( $params['key'] ) ? $params['key'] : '';
 		}
 		if ( '' === $provided ) {
+			// No credentials at all: point OAuth-capable clients at the sign-in flow.
+			if ( WPMCP_OAuth::enabled() ) {
+				WPMCP_OAuth::send_challenge();
+				return new WP_Error( 'wpmcp_missing_key', 'Authorization required. Connect through OAuth or send an API key in the x-api-key header.', array( 'status' => 401 ) );
+			}
 			return new WP_Error(
 				'wpmcp_missing_key',
 				'Missing API key. Send it in the x-api-key header (or Authorization: Bearer).',
 				array( 'status' => 403 )
 			);
+		}
+
+		if ( '' === $stored ) {
+			return new WP_Error( 'wpmcp_bad_key', 'Invalid API key.', array( 'status' => 403 ) );
 		}
 
 		$fail_key = self::fail_key();
@@ -132,7 +154,7 @@ class WPMCP_Auth {
 	 *
 	 * @return string
 	 */
-	private static function fail_key() {
+	public static function fail_key() {
 		$ip = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '';
 		$ip = (string) apply_filters( 'wpmcp_client_ip', $ip );
 		return 'wpmcp_fail_' . md5( $ip );
