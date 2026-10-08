@@ -1,0 +1,64 @@
+<?php
+/**
+ * Plugin Name:       WP MCP
+ * Description:       Turns this WordPress site into its own remote MCP server so Claude, Gemini or any MCP client can manage pages, posts, custom post types, media, taxonomies and Elementor layouts.
+ * Version:           2.3.0
+ * Author:            Saifullah Qadeer
+ * License:           GPL-2.0-or-later
+ * Text Domain:       wp-mcp
+ * Requires at least: 5.6
+ * Requires PHP:      7.4
+ *
+ * Elementor tested up to: 4.x
+ */
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit; // No direct access.
+}
+
+define( 'WPMCP_VERSION', '2.3.0' );
+define( 'WPMCP_NAMESPACE', 'wpmcp/v1' );
+define( 'WPMCP_PLUGIN_FILE', __FILE__ );
+define( 'WPMCP_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
+define( 'WPMCP_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
+
+// Host tool-result size cap. Claude.ai / Desktop truncate around 150,000
+// characters; we stop short of that and tell the model how to ask for less.
+if ( ! defined( 'WPMCP_MAX_RESULT_CHARS' ) ) {
+	define( 'WPMCP_MAX_RESULT_CHARS', 140000 );
+}
+
+require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-auth.php';
+require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-file-safety.php';
+require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-extensions.php';
+require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-elementor.php';
+require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-core.php';
+require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-rest.php';
+require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-mcp.php';
+require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-admin.php';
+
+/**
+ * On activation: generate an API key if one does not exist yet.
+ */
+function wpmcp_activate() {
+	if ( ! get_option( 'wpmcp_api_key' ) ) {
+		update_option( 'wpmcp_api_key', WPMCP_Auth::generate_key() );
+	}
+	// Default: allow all registered public post types unless the admin narrows it.
+	if ( false === get_option( 'wpmcp_enabled', false ) ) {
+		update_option( 'wpmcp_enabled', '1' );
+	}
+}
+register_activation_hook( __FILE__, 'wpmcp_activate' );
+
+/**
+ * Bootstrap the plugin.
+ */
+function wpmcp_init() {
+	( new WPMCP_REST() )->register_hooks();
+	( new WPMCP_MCP() )->register_hooks();
+	if ( is_admin() ) {
+		( new WPMCP_Admin() )->register_hooks();
+	}
+}
+add_action( 'plugins_loaded', 'wpmcp_init' );
