@@ -3,7 +3,7 @@ Author: Saifullah Qadeer
 Requires at least: 5.6
 Requires PHP: 7.4
 Tested with Elementor: 4.x
-Stable tag: 2.4.0
+Stable tag: 2.4.1
 License: GPL-2.0-or-later
 
 Turns a WordPress site into its own remote MCP server, so Claude (web, Desktop,
@@ -126,6 +126,9 @@ wp_set_elementor also accepts "page_settings" for _elementor_page_settings, on
 its own or alongside elements.
 
 == Changelog ==
+
+= 2.4.1 =
+* Update checks refresh hourly, and Dashboard > Updates > Check Again bypasses the cache.
 
 = 2.4.0 =
 * Updates are offered in the WordPress Plugins screen from GitHub releases
