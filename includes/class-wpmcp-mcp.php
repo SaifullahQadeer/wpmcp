@@ -336,8 +336,8 @@ class WPMCP_MCP {
 		return "This server controls one WordPress site.\n"
 			. "Before editing code: read the existing file, preserve literal PHP tags (never HTML-encode source), run wp_edit_extension_file with dry_run=true, then apply one change at a time using the current hash. Save the returned backup_id, run wp_ping, and check the affected page. Backups can be listed and restored while WordPress still works. Stop issuing edits if responses become malformed; bootstrap failures require hosting backup, SFTP, or file-manager recovery. Never claim this connector can repair every outage.\n"
 			. "Call wp_ping first: it reports the Elementor version and editor generation (v3 classic vs v4 atomic), which decides the JSON shape wp_set_elementor expects.\n"
-			. "Every change you make is recorded. If the user asks to undo something, call wp_list_history to find it and wp_rollback to reverse it; if wp_rollback reports the item was edited since, tell the user before using force.
-"
+			. "Every change you make is recorded. If the user asks to undo something, call wp_list_history to find it and wp_rollback to reverse it; if wp_rollback reports the item was edited since, tell the user before using force.\n"
+			. "Check a page's \"builder\" (from wp_get_content or wp_ping) before editing its layout: gutenberg pages use wp_get_blocks and wp_set_blocks (block markup, checked before saving), elementor pages use wp_get_elementor and wp_set_elementor, divi pages use wp_get_divi and wp_set_divi, and classic pages use wp_update_content. Do not mix editors on one page. After changing layouts, settings or plugins, call wp_clear_cache if the front end does not show the change.\n"
 			. "Elementor layouts can be very large. Read them with wp_get_elementor using summary=true first, then fetch one section at a time with index=N. Write them back section by section using the __append__ or __replace__ markers rather than resending the whole tree.";
 	}
 
@@ -405,6 +405,10 @@ class WPMCP_MCP {
 				return 'call wp_get_elementor again with summary=true to see the section outline, then with index=N (and optionally depth=N) for one section at a time.';
 			case 'wp_get_content':
 				return 'call wp_get_content with include_elementor=false, then use wp_get_elementor with summary=true for the layout.';
+			case 'wp_get_blocks':
+				return 'call wp_get_blocks with summary=true for the outline, then index=N for one top-level block.';
+			case 'wp_get_divi':
+				return 'call wp_get_divi with summary=true for the outline, then index=N for one section.';
 			case 'wp_list_content':
 			case 'wp_list_media':
 				return 'lower per_page and page through the results.';
@@ -513,6 +517,30 @@ class WPMCP_MCP {
 				$body = $args;
 				unset( $body['taxonomy'] );
 				return WPMCP_Core::create_term( $args['taxonomy'], $body );
+
+			case 'wp_list_block_types':
+				return WPMCP_Builders::list_block_types( isset( $args['search'] ) ? (string) $args['search'] : '', isset( $args['limit'] ) ? max( 1, min( 200, (int) $args['limit'] ) ) : 60 );
+
+			case 'wp_get_blocks':
+				return isset( $args['id'] ) ? WPMCP_Builders::get_blocks( (int) $args['id'], $args ) : new WP_Error( 'wpmcp_missing_arg', 'Missing "id".' );
+
+			case 'wp_set_blocks':
+				return isset( $args['id'], $args['content'] ) ? WPMCP_Builders::set_blocks( (int) $args['id'], $args['content'], $args ) : new WP_Error( 'wpmcp_missing_arg', 'Missing "id" or "content".' );
+
+			case 'wp_get_divi':
+				return isset( $args['id'] ) ? WPMCP_Builders::get_divi( (int) $args['id'], $args ) : new WP_Error( 'wpmcp_missing_arg', 'Missing "id".' );
+
+			case 'wp_set_divi':
+				return isset( $args['id'], $args['content'] ) ? WPMCP_Builders::set_divi( (int) $args['id'], $args['content'], $args ) : new WP_Error( 'wpmcp_missing_arg', 'Missing "id" or "content".' );
+
+			case 'wp_clear_cache':
+				return WPMCP_Site::clear_cache( isset( $args['targets'] ) ? (array) $args['targets'] : array() );
+
+			case 'wp_get_settings':
+				return WPMCP_Site::get_settings();
+
+			case 'wp_update_settings':
+				return WPMCP_Site::update_settings( isset( $args['settings'] ) ? $args['settings'] : null );
 
 			case 'wp_list_history':
 				$per_page = isset( $args['per_page'] ) ? max( 1, min( 50, (int) $args['per_page'] ) ) : 20;
@@ -764,6 +792,90 @@ class WPMCP_MCP {
 					'force' => array( 'type' => 'boolean', 'description' => 'Roll back even though the item was edited after the change. Only after the user agrees to overwrite those edits.' ),
 				), array( 'id' ) ),
 				'annotations' => self::ann( 'Roll back a change', false, true, false ),
+			),
+			array(
+				'name'        => 'wp_list_block_types',
+				'title'       => 'List block types',
+				'description' => 'List the Gutenberg blocks registered on this site (name, title, category, attribute names). Use it to check a block exists before writing markup that uses it.',
+				'inputSchema' => self::obj( array(
+					'search' => array( 'type' => 'string', 'description' => 'Filter by name or title, e.g. "button".' ),
+					'limit'  => array( 'type' => 'integer', 'description' => 'Maximum blocks to return (default 60).' ),
+				) ),
+				'annotations' => self::ann( 'List block types', true, false, true ),
+			),
+			array(
+				'name'        => 'wp_get_blocks',
+				'title'       => 'Read block editor content',
+				'description' => 'Read a post or page built with the block editor (Gutenberg) as block markup. Start with summary=true for a numbered outline of the top-level blocks, then read one with index=N. Without arguments it returns the whole markup, which can be large. Check "builder" in the result: elementor and divi pages have their own tools.',
+				'inputSchema' => self::obj( array(
+					'id'      => array( 'type' => 'integer', 'description' => 'Post or page ID.' ),
+					'summary' => array( 'type' => 'boolean', 'description' => 'Return an outline of the top-level blocks only.' ),
+					'index'   => array( 'type' => 'integer', 'description' => 'Return one top-level block (markup and structure).' ),
+					'depth'   => array( 'type' => 'integer', 'description' => 'How many levels of inner blocks to describe with index (default 3).' ),
+				), array( 'id' ) ),
+				'annotations' => self::ann( 'Read block editor content', true, false, true ),
+			),
+			array(
+				'name'        => 'wp_set_blocks',
+				'title'       => 'Write block editor content',
+				'description' => 'Write block markup (for example <!-- wp:paragraph --><p>Hi</p><!-- /wp:paragraph -->) to a post or page. The markup is checked first: every block must be closed in order and its attributes must be valid JSON, otherwise nothing is saved. mode: replace (default, the whole content), append, prepend, insert (before index), or replace_block (the top-level block at index). Registered-block warnings are returned. Pages built with Elementor or Divi are refused unless force=true.',
+				'inputSchema' => self::obj( array(
+					'id'      => array( 'type' => 'integer', 'description' => 'Post or page ID.' ),
+					'content' => array( 'type' => 'string', 'description' => 'Block markup.' ),
+					'mode'    => array( 'type' => 'string', 'enum' => array( 'replace', 'append', 'prepend', 'insert', 'replace_block' ), 'description' => 'How to combine with the existing content (default replace).' ),
+					'index'   => array( 'type' => 'integer', 'description' => 'Top-level block position for insert and replace_block.' ),
+					'force'   => array( 'type' => 'boolean', 'description' => 'Write blocks over an Elementor or Divi page.' ),
+				), array( 'id', 'content' ) ),
+				'annotations' => self::ann( 'Write block editor content', false, true, false ),
+			),
+			array(
+				'name'        => 'wp_get_divi',
+				'title'       => 'Read a Divi layout',
+				'description' => 'Read a page built with the Divi Builder (Divi 4 shortcodes). Start with summary=true for a numbered outline of the sections (rows, modules, text), then read one with index=N. Without arguments it returns the whole shortcode content. On Divi 5 sites use wp_get_blocks instead.',
+				'inputSchema' => self::obj( array(
+					'id'      => array( 'type' => 'integer', 'description' => 'Post or page ID.' ),
+					'summary' => array( 'type' => 'boolean', 'description' => 'Return an outline of the sections only.' ),
+					'index'   => array( 'type' => 'integer', 'description' => 'Return one section.' ),
+				), array( 'id' ) ),
+				'annotations' => self::ann( 'Read a Divi layout', true, false, true ),
+			),
+			array(
+				'name'        => 'wp_set_divi',
+				'title'       => 'Write a Divi layout',
+				'description' => 'Write a Divi 4 layout as shortcodes ([et_pb_section][et_pb_row][et_pb_column][et_pb_text]...[/et_pb_text][/et_pb_column][/et_pb_row][/et_pb_section]). Shortcodes must be nested and closed correctly and start with a section, otherwise nothing is saved. mode: replace (default), append, prepend, insert (before index) or replace_section (at index). Turns the Divi Builder on for the page and clears Divi\'s cached CSS. Elementor pages are refused unless force=true.',
+				'inputSchema' => self::obj( array(
+					'id'      => array( 'type' => 'integer', 'description' => 'Post or page ID.' ),
+					'content' => array( 'type' => 'string', 'description' => 'Divi shortcode content.' ),
+					'mode'    => array( 'type' => 'string', 'enum' => array( 'replace', 'append', 'prepend', 'insert', 'replace_section' ), 'description' => 'How to combine with the existing layout (default replace).' ),
+					'index'   => array( 'type' => 'integer', 'description' => 'Section position for insert and replace_section.' ),
+					'force'   => array( 'type' => 'boolean', 'description' => 'Write over an Elementor page.' ),
+				), array( 'id', 'content' ) ),
+				'annotations' => self::ann( 'Write a Divi layout', false, true, false ),
+			),
+			array(
+				'name'        => 'wp_clear_cache',
+				'title'       => 'Clear caches',
+				'description' => 'Clear caches so changes show on the front end: the WordPress object cache, expired transients, Elementor CSS, Divi static resources, and the page cache plugin if one is installed (LiteSpeed, WP Rocket, W3 Total Cache, WP Super Cache, WP Fastest Cache, Autoptimize, SiteGround, Cache Enabler, Breeze, Hummingbird, Nginx Helper). Reports what was cleared. Host-level and CDN caches are outside WordPress and are not cleared.',
+				'inputSchema' => self::obj( array(
+					'targets' => array( 'type' => 'array', 'items' => array( 'type' => 'string', 'enum' => array( 'object', 'transients', 'elementor', 'divi', 'page' ) ), 'description' => 'Which caches to clear. Omit for all.' ),
+				) ),
+				'annotations' => self::ann( 'Clear caches', false, false, true ),
+			),
+			array(
+				'name'        => 'wp_get_settings',
+				'title'       => 'Read site settings',
+				'description' => 'Read common site settings: title, tagline, timezone, date and time format, posts per page, homepage and posts page, search engine visibility, default comment status and permalink structure.',
+				'inputSchema' => self::obj( array() ),
+				'annotations' => self::ann( 'Read site settings', true, false, true ),
+			),
+			array(
+				'name'        => 'wp_update_settings',
+				'title'       => 'Change site settings',
+				'description' => 'Change common site settings (see wp_get_settings for the names). All values are checked first and nothing is changed if one is invalid. Site and home URLs, the admin email, registration and user roles cannot be changed here. The previous values are saved so the change can be rolled back.',
+				'inputSchema' => self::obj( array(
+					'settings' => array( 'type' => 'object', 'description' => 'Setting names and new values, e.g. {"blogname":"My site","posts_per_page":12}.' ),
+				), array( 'settings' ) ),
+				'annotations' => self::ann( 'Change site settings', false, true, false ),
 			),
 		);
 	}

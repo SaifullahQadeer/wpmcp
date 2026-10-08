@@ -79,9 +79,9 @@ class WPMCP_Admin {
 			update_option( 'wpmcp_api_key', WPMCP_Auth::generate_key(), false );
 			$message = 'Key rotated. Update the key in each client that uses it.';
 		} elseif ( 'save' === $action ) {
-			foreach ( array( 'enabled', 'oauth_enabled', 'allow_url_key', 'extensions_enabled', 'allow_install', 'allow_edit' ) as $setting ) {
+			foreach ( array( 'enabled', 'oauth_enabled', 'allow_url_key', 'extensions_enabled', 'allow_install', 'allow_edit', 'allow_activate' ) as $setting ) {
 				$value = isset( $_POST[ 'wpmcp_' . $setting ] ) ? '1' : '0';
-				if ( is_multisite() && in_array( $setting, array( 'extensions_enabled', 'allow_install', 'allow_edit' ), true ) ) { $value = '0'; }
+				if ( is_multisite() && in_array( $setting, array( 'extensions_enabled', 'allow_install', 'allow_edit', 'allow_activate' ), true ) ) { $value = '0'; }
 				update_option( 'wpmcp_' . $setting, $value );
 			}
 			update_option( 'wpmcp_extension_owner', get_current_user_id() );
@@ -259,16 +259,20 @@ class WPMCP_Admin {
 		if ( '1' !== (string) get_option( 'wpmcp_extensions_enabled', '0' ) ) { return array( false, 'Turn on extension access' ); }
 		if ( 'wp_install_extension' === $name && '1' !== (string) get_option( 'wpmcp_allow_install', '0' ) ) { return array( false, 'Turn on installation' ); }
 		if ( in_array( $name, array( 'wp_edit_extension_file', 'wp_restore_extension_file' ), true ) && '1' !== (string) get_option( 'wpmcp_allow_edit', '0' ) ) { return array( false, 'Turn on code editing' ); }
+		if ( 'wp_set_extension_active' === $name && '1' !== (string) get_option( 'wpmcp_allow_activate', '0' ) ) { return array( false, 'Turn on activation' ); }
 		return array( true, '' );
 	}
 
 	private function render_tools() {
 		$groups = array(
-			'Site & content'   => array( 'wp_ping', 'wp_list_post_types', 'wp_list_content', 'wp_get_content', 'wp_create_content', 'wp_update_content', 'wp_delete_content' ),
-			'Elementor'        => array( 'wp_get_elementor', 'wp_set_elementor' ),
-			'Media & taxonomy' => array( 'wp_upload_media', 'wp_list_media', 'wp_list_terms', 'wp_create_term' ),
-			'History'          => array( 'wp_list_history', 'wp_rollback' ),
-			'Plugins & themes' => WPMCP_Extensions::tool_names(),
+			'Site & content'          => array( 'wp_ping', 'wp_list_post_types', 'wp_list_content', 'wp_get_content', 'wp_create_content', 'wp_update_content', 'wp_delete_content' ),
+			'Block editor (Gutenberg)' => array( 'wp_list_block_types', 'wp_get_blocks', 'wp_set_blocks' ),
+			'Elementor'               => array( 'wp_get_elementor', 'wp_set_elementor' ),
+			'Divi'                    => array( 'wp_get_divi', 'wp_set_divi' ),
+			'Media & taxonomy'        => array( 'wp_upload_media', 'wp_list_media', 'wp_list_terms', 'wp_create_term' ),
+			'Settings & cache'        => array( 'wp_get_settings', 'wp_update_settings', 'wp_clear_cache' ),
+			'History'                 => array( 'wp_list_history', 'wp_rollback' ),
+			'Plugins & themes'        => WPMCP_Extensions::tool_names(),
 		);
 		$specs = array();
 		foreach ( WPMCP_MCP::tools_spec() as $spec ) { $specs[ $spec['name'] ] = $spec; }
@@ -350,7 +354,7 @@ class WPMCP_Admin {
 		<?php $this->toggle( 'enabled', 'Enable MCP server', 'Allow authenticated apps to use this site’s tools. Turn off to pause everything.', '1' ); $this->toggle( 'oauth_enabled', 'Allow sign-in with OAuth', 'Lets AI apps connect with a Connect button and your approval, with no key to copy. Requires HTTPS.', '1' ); $this->toggle( 'allow_url_key', 'Allow API keys in URLs', 'For apps that cannot send headers. Headers keep keys out of server logs, so leave this off if you can.', '1' ); ?>
 		</section>
 		<section class="wpmcp-panel"><div class="wpmcp-panel-head"><h2><?php echo $this->icon( 'layers' ); ?>Plugins & themes</h2><p>Extension tools use the WordPress permissions of the administrator who saves these settings. They need HTTPS and a signed-in app or an API key header. Multisite is not supported.</p></div>
-		<?php $this->toggle( 'extensions_enabled', 'Allow extension access', 'List installed plugins and themes and read their editable files.' ); $this->toggle( 'allow_install', 'Allow installation', 'Install from WordPress.org. Installed extensions stay inactive.' ); $this->toggle( 'allow_edit', 'Allow code editing', 'Edit existing source files. Changes can break the site, so use a backup or staging site.' ); ?>
+		<?php $this->toggle( 'extensions_enabled', 'Allow extension access', 'List installed plugins and themes and read their editable files.' ); $this->toggle( 'allow_install', 'Allow installation', 'Install from WordPress.org. Installed extensions stay inactive.' ); $this->toggle( 'allow_edit', 'Allow code editing', 'Edit existing source files. Changes can break the site, so use a backup or staging site.' ); $this->toggle( 'allow_activate', 'Allow activation', 'Activate or deactivate installed plugins and switch the theme. WP MCP itself cannot be deactivated this way.' ); ?>
 		<div class="wpmcp-save"><button class="button button-primary button-hero">Save settings</button><span>Installation and editing also need extension access.</span></div></section>
 		</form>
 

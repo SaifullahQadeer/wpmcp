@@ -4,7 +4,7 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 class WPMCP_Extensions {
 	public static function tool_names() {
-		return array( 'wp_list_extensions', 'wp_install_extension', 'wp_list_extension_files', 'wp_read_extension_file', 'wp_edit_extension_file', 'wp_list_file_backups', 'wp_restore_extension_file' );
+		return array( 'wp_list_extensions', 'wp_install_extension', 'wp_list_extension_files', 'wp_read_extension_file', 'wp_edit_extension_file', 'wp_list_file_backups', 'wp_restore_extension_file', 'wp_set_extension_active' );
 	}
 
 	public static function tools_spec() {
@@ -22,6 +22,7 @@ class WPMCP_Extensions {
 		$defs['wp_edit_extension_file'][1]['dry_run'] = array( 'type' => 'boolean', 'description' => 'Validate source and current hash without writing. Use this before every edit.' );
 		$defs['wp_list_file_backups'] = array( 'List up to ten pre-edit snapshots for a file, newest first. Recovery requires working WordPress and MCP.', array_merge( $base, array( 'file' => $text ) ), array( 'kind', 'extension', 'file' ), true );
 		$defs['wp_restore_extension_file'] = array( 'Restore a saved file snapshot through the same validation and WordPress editor checks. Requires the current file hash; saves a snapshot before restoring. Cannot recover a WordPress bootstrap failure.', array_merge( $base, array( 'file' => $text, 'backup_id' => $text, 'expected_sha256' => $text ) ), array( 'kind', 'extension', 'file', 'backup_id', 'expected_sha256' ), false );
+		$defs['wp_set_extension_active'] = array( 'Activate or deactivate an installed plugin, or switch the active theme (themes cannot be deactivated, switch to another one). WP MCP itself cannot be deactivated this way.', array_merge( $base, array( 'active' => array( 'type' => 'boolean', 'description' => 'true to activate, false to deactivate (plugins only).' ) ) ), array( 'kind', 'extension', 'active' ), false );
 		foreach ( $defs as $name => $d ) {
 			$out[] = array( 'name' => $name, 'title' => ucwords( str_replace( '_', ' ', substr( $name, 3 ) ) ), 'description' => $d[0] . ' Requires administrator opt-in, HTTPS, and header authentication.', 'inputSchema' => array( 'type' => 'object', 'properties' => $d[1], 'required' => $d[2], 'additionalProperties' => false ), 'annotations' => array( 'readOnlyHint' => $d[3], 'destructiveHint' => ! $d[3], 'idempotentHint' => $d[3], 'openWorldHint' => 'wp_install_extension' === $name ) );
 		}
@@ -45,10 +46,47 @@ class WPMCP_Extensions {
 			if ( ! current_user_can( $cap ) ) { return new WP_Error( 'wpmcp_capability', 'The authorizing administrator lacks the required WordPress capability.' ); }
 			if ( 'wp_install_extension' === $name && '1' !== (string) get_option( 'wpmcp_allow_install', '0' ) ) { return new WP_Error( 'wpmcp_install_disabled', 'Installation access is disabled.' ); }
 			if ( in_array( $name, array( 'wp_edit_extension_file', 'wp_restore_extension_file' ), true ) && '1' !== (string) get_option( 'wpmcp_allow_edit', '0' ) ) { return new WP_Error( 'wpmcp_edit_disabled', 'File editing access is disabled.' ); }
+			if ( 'wp_set_extension_active' === $name && '1' !== (string) get_option( 'wpmcp_allow_activate', '0' ) ) { return new WP_Error( 'wpmcp_activate_disabled', 'Activation access is disabled.' ); }
 			require_once ABSPATH . 'wp-admin/includes/plugin.php';
 			require_once ABSPATH . 'wp-admin/includes/file.php';
 			return self::execute( $name, $kind, $args );
 		} finally { wp_set_current_user( $previous ); }
+	}
+
+	/** Activate or deactivate a plugin, or switch the theme, and record how to undo it. */
+	public static function set_active( $kind, $id, $active ) {
+		if ( ! is_string( $id ) || '' === $id || 0 !== validate_file( $id ) ) { return new WP_Error( 'wpmcp_extension', 'Invalid extension identifier.' ); }
+		if ( 'plugin' === $kind ) {
+			if ( ! array_key_exists( $id, get_plugins() ) ) { return new WP_Error( 'wpmcp_extension', 'Plugin not found.' ); }
+			if ( ! $active && plugin_basename( WPMCP_PLUGIN_FILE ) === $id ) { return new WP_Error( 'wpmcp_self', 'WP MCP cannot deactivate itself: that would cut off this connection.' ); }
+			$was = is_plugin_active( $id );
+			if ( $was === (bool) $active ) { return array( 'extension' => $id, 'active' => $was, 'changed' => false ); }
+			if ( $active ) {
+				$result = activate_plugin( $id );
+				if ( is_wp_error( $result ) ) { return $result; }
+			} else {
+				deactivate_plugins( $id );
+			}
+			if ( is_plugin_active( $id ) !== (bool) $active ) { return new WP_Error( 'wpmcp_activation_failed', 'WordPress did not change the plugin state.' ); }
+			WPMCP_History::record( 'wp_set_extension_active', 'extension', 0, 'plugin ' . $id, ( $active ? 'Activated' : 'Deactivated' ) . ' plugin ' . $id, array( 'op' => 'set_active', 'kind' => 'plugin', 'extension' => $id, 'active' => $was ) );
+			return array( 'extension' => $id, 'active' => (bool) $active, 'changed' => true );
+		}
+		$theme = wp_get_theme( $id );
+		if ( ! $theme->exists() ) { return new WP_Error( 'wpmcp_extension', 'Theme not found.' ); }
+		if ( ! $active ) { return new WP_Error( 'wpmcp_theme_deactivate', 'A theme cannot be deactivated. Activate a different theme instead.' ); }
+		$previous = get_stylesheet();
+		if ( $previous === $id ) { return array( 'extension' => $id, 'active' => true, 'changed' => false ); }
+		switch_theme( $id );
+		WPMCP_History::record( 'wp_set_extension_active', 'extension', 0, 'theme ' . $id, 'Switched theme to ' . $id, array( 'op' => 'set_active', 'kind' => 'theme', 'extension' => $previous, 'active' => true ) );
+		return array( 'extension' => $id, 'active' => true, 'changed' => true, 'previous_theme' => $previous );
+	}
+
+	/** Roll back an activation change from the admin screen. */
+	public static function admin_set_active( $kind, $id, $active ) {
+		if ( ! in_array( $kind, array( 'plugin', 'theme' ), true ) || ! current_user_can( 'plugin' === $kind ? 'activate_plugins' : 'switch_themes' ) ) { return new WP_Error( 'wpmcp_capability', 'You do not have permission to change this.' ); }
+		require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		$result = self::set_active( $kind, $id, $active );
+		return is_wp_error( $result ) ? $result : true;
 	}
 
 	/** Roll back a file edit from the admin screen: same checks as the tool, run as the signed-in administrator. */
@@ -90,6 +128,7 @@ class WPMCP_Extensions {
 			if ( true !== $result ) { return new WP_Error( 'wpmcp_install_failed', 'Installation failed. Check filesystem access and whether the extension is already installed.' ); }
 			return array( 'installed' => true, 'slug' => $slug, 'activated' => false );
 		}
+		if ( 'wp_set_extension_active' === $name ) { return self::set_active( $kind, isset( $args['extension'] ) ? $args['extension'] : '', ! empty( $args['active'] ) ); }
 		$id = isset( $args['extension'] ) ? $args['extension'] : '';
 		if ( ! is_string( $id ) || '' === $id || 0 !== validate_file( $id ) ) { return new WP_Error( 'wpmcp_extension', 'Invalid extension identifier.' ); }
 		if ( 'plugin' === $kind ) {

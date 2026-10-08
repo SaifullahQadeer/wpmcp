@@ -3,7 +3,7 @@ Author: Saifullah Qadeer
 Requires at least: 5.6
 Requires PHP: 7.4
 Tested with Elementor: 4.x
-Stable tag: 2.9.2
+Stable tag: 2.10.0
 License: GPL-2.0-or-later
 
 Turns a WordPress site into its own remote MCP server, so Claude (web, Desktop,
@@ -40,14 +40,48 @@ keys are not accepted.
 Requirements: the site must be on HTTPS, and permalinks must not be set to
 "Plain" (otherwise /wp-json/ 404s).
 
-== Tools (22) ==
+== Tools (31) ==
 
 wp_ping, wp_list_post_types, wp_list_content, wp_get_content, wp_create_content,
 wp_update_content, wp_delete_content, wp_get_elementor, wp_set_elementor,
 wp_upload_media, wp_list_media, wp_list_terms, wp_create_term,
 wp_list_extensions, wp_install_extension, wp_list_extension_files,
 wp_read_extension_file, wp_edit_extension_file, wp_list_file_backups,
-wp_restore_extension_file, wp_list_history, wp_rollback.
+wp_restore_extension_file, wp_set_extension_active, wp_list_history, wp_rollback,
+wp_list_block_types, wp_get_blocks, wp_set_blocks, wp_get_divi, wp_set_divi,
+wp_clear_cache, wp_get_settings, wp_update_settings.
+
+== Page builders, cache and settings ==
+
+wp_ping reports each page's editor ("builder": gutenberg, elementor, divi or classic), the
+Divi version and generation, and which cache plugins were found. Use the tools that match
+the builder and do not mix editors on one page.
+
+Gutenberg: wp_get_blocks (summary, then one block by index) and wp_set_blocks write block
+markup (replace, append, prepend, insert, replace_block). Every block comment must be closed
+in order and its attributes must be valid JSON, otherwise nothing is saved. Unregistered blocks
+are reported as warnings. wp_list_block_types shows what is available.
+
+Divi 4: wp_get_divi and wp_set_divi read and write shortcode layouts section by section. Nesting
+is checked, the Divi Builder is switched on for the page and Divi's cached CSS is cleared.
+Divi 5 stores layouts as blocks, so use the Gutenberg tools there.
+
+wp_clear_cache clears the object cache, expired transients, Elementor CSS, Divi static
+resources and the page cache plugin if present (LiteSpeed, WP Rocket, W3 Total Cache, WP Super
+Cache, WP Fastest Cache, Autoptimize, SiteGround, Cache Enabler, Breeze, Hummingbird, Nginx
+Helper). CDN and host-level caches are outside WordPress.
+
+wp_get_settings and wp_update_settings cover title, tagline, timezone, date and time format,
+posts per page, homepage and posts page, search engine visibility, comment defaults and the
+permalink structure. Values are validated together, previous values are saved for rollback,
+and URLs, the admin email, registration and roles cannot be changed.
+
+wp_set_extension_active activates or deactivates a plugin or switches the theme. It is off
+until you turn on Allow activation, and WP MCP cannot deactivate itself.
+
+With an API key the requests run without a WordPress user, so WordPress may filter some HTML
+(for example scripts or iframes) from content. Connecting through OAuth runs them as the
+administrator who approved the app.
 
 == Change history and rollback ==
 
@@ -143,6 +177,14 @@ The admin screen bundles the Inter typeface (SIL Open Font License 1.1, see
 assets/fonts/Inter-LICENSE.txt). Nothing is loaded from external servers.
 
 == Changelog ==
+
+= 2.10.0 =
+* Block editor (Gutenberg) tools: read blocks as an outline or one block at a time, and write block markup with replace, append, prepend, insert and replace-block modes. Markup is validated before saving.
+* Divi 4 tools: read and write shortcode layouts section by section, with nesting checks. Divi 5 sites are pointed at the block tools.
+* Clear caches from the assistant: object cache, transients, Elementor, Divi and eleven page cache plugins.
+* Read and change common site settings, with validation and rollback.
+* Activate or deactivate plugins and switch themes (off until you turn on Allow activation).
+* wp_ping and wp_get_content now say which editor built each page and which cache plugins are installed.
 
 = 2.9.2 =
 * Cleaner typography: the admin screen now uses the Inter typeface, bundled with the plugin (no external font requests), with regular, medium, semibold and bold weights used consistently.

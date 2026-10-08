@@ -303,6 +303,11 @@ class WPMCP_History {
 		} elseif ( 'delete_term' === $op ) {
 			$deleted = wp_delete_term( (int) $data['term_id'], $data['taxonomy'] );
 			$result  = true === $deleted ? true : new WP_Error( 'wpmcp_failed', 'Could not delete the term.' );
+		} elseif ( 'restore_options' === $op ) {
+			$result = WPMCP_Site::restore_options( $data['values'] );
+		} elseif ( 'set_active' === $op ) {
+			if ( ! $files ) { return new WP_Error( 'wpmcp_use_admin', 'Plugin and theme activation is rolled back from the WP MCP History screen.' ); }
+			$result = WPMCP_Extensions::admin_set_active( $data['kind'], $data['extension'], ! empty( $data['active'] ) );
 		} elseif ( 'file' === $op ) {
 			if ( ! $files ) { return new WP_Error( 'wpmcp_use_file_tool', 'File edits are rolled back from the WP MCP History screen, or with wp_restore_extension_file using backup_id ' . $data['backup_id'] . '.' ); }
 			$result = WPMCP_Extensions::admin_restore( $data['kind'], $data['extension'], $data['file'], $data['backup_id'] );

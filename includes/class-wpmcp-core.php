@@ -32,6 +32,7 @@ class WPMCP_Core {
 			'date'           => $post->post_date_gmt,
 			'modified'       => $post->post_modified_gmt,
 			'featured_media' => (int) get_post_thumbnail_id( $post->ID ),
+			'builder'        => WPMCP_Builders::builder_for( $post->ID ),
 		);
 
 		if ( $include_body ) {
@@ -140,6 +141,8 @@ class WPMCP_Core {
 			'php_version'        => PHP_VERSION,
 			'elementor_active'   => WPMCP_Elementor::is_active(),
 			'elementor'          => WPMCP_Elementor::environment(),
+			'editors'            => WPMCP_Builders::environment(),
+			'cache_plugins'      => WPMCP_Site::detected_caches(),
 			'max_result_chars'   => (int) apply_filters( 'wpmcp_max_result_chars', WPMCP_MAX_RESULT_CHARS ),
 			'post_types'         => $types,
 		);

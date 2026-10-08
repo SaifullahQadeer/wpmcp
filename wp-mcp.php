@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name:       WP MCP
- * Description:       Turns this WordPress site into its own remote MCP server so Claude, Gemini or any MCP client can manage pages, posts, custom post types, media, taxonomies and Elementor layouts.
- * Version:           2.9.2
+ * Description:       Turns this WordPress site into its own remote MCP server so Claude, Gemini or any MCP client can manage pages, posts, custom post types, media, taxonomies, and Gutenberg, Divi and Elementor layouts.
+ * Version:           2.10.0
  * Author:            Saifullah Qadeer
  * License:           GPL-2.0-or-later
  * Text Domain:       wp-mcp
@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // No direct access.
 }
 
-define( 'WPMCP_VERSION', '2.9.2' );
+define( 'WPMCP_VERSION', '2.10.0' );
 define( 'WPMCP_NAMESPACE', 'wpmcp/v1' );
 define( 'WPMCP_PLUGIN_FILE', __FILE__ );
 define( 'WPMCP_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
@@ -32,6 +32,8 @@ if ( ! defined( 'WPMCP_MAX_RESULT_CHARS' ) ) {
 require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-auth.php';
 require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-oauth.php';
 require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-history.php';
+require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-builders.php';
+require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-site.php';
 require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-file-safety.php';
 require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-extensions.php';
 require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-elementor.php';
