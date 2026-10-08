@@ -6,10 +6,17 @@ class WPMCP_Admin {
 		add_action( 'admin_menu', array( $this, 'add_menu' ) );
 		add_action( 'admin_init', array( $this, 'handle_actions' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'assets' ) );
+		add_filter( 'plugin_action_links_' . plugin_basename( WPMCP_PLUGIN_FILE ), array( $this, 'action_links' ) );
 	}
-	public function add_menu() { add_options_page( 'WP MCP', 'WP MCP', 'manage_options', 'wp-mcp', array( $this, 'render_page' ) ); }
+	public function add_menu() { add_menu_page( 'WP MCP', 'WP MCP', 'manage_options', 'wp-mcp', array( $this, 'render_page' ), 'dashicons-rest-api', 80 ); }
+	/** Put a Settings link before Deactivate on the Plugins screen. */
+	public function action_links( $links ) {
+		if ( ! current_user_can( 'manage_options' ) ) { return $links; }
+		array_unshift( $links, '<a href="' . esc_url( admin_url( 'admin.php?page=wp-mcp' ) ) . '">Settings</a>' );
+		return $links;
+	}
 	public function assets( $hook ) {
-		if ( 'settings_page_wp-mcp' !== $hook ) { return; }
+		if ( 'toplevel_page_wp-mcp' !== $hook ) { return; }
 		wp_enqueue_style( 'wpmcp-admin', WPMCP_PLUGIN_URL . 'assets/admin.css', array(), WPMCP_VERSION );
 		wp_enqueue_script( 'wpmcp-admin', WPMCP_PLUGIN_URL . 'assets/admin.js', array(), WPMCP_VERSION, true );
 	}
@@ -30,7 +37,7 @@ class WPMCP_Admin {
 			$message = 'Connection and permissions saved.';
 		} else { return; }
 		set_transient( 'wpmcp_notice_' . get_current_user_id(), $message, 60 );
-		wp_safe_redirect( admin_url( 'options-general.php?page=wp-mcp' ) );
+		wp_safe_redirect( admin_url( 'admin.php?page=wp-mcp' ) );
 		exit;
 	}
 	private function field( $id, $label, $value, $secret = false ) {

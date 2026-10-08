@@ -72,7 +72,7 @@ class WPMCP_Auth {
 		if ( '1' !== (string) get_option( 'wpmcp_enabled', '1' ) ) {
 			return new WP_Error(
 				'wpmcp_disabled',
-				'WP MCP is disabled. Enable it in Settings -> WP MCP.',
+				'WP MCP is disabled. Enable it in the WP MCP admin menu.',
 				array( 'status' => 403 )
 			);
 		}
@@ -81,7 +81,7 @@ class WPMCP_Auth {
 		if ( '' === $stored ) {
 			return new WP_Error(
 				'wpmcp_no_key',
-				'No API key configured on the site. Open Settings -> WP MCP and generate one.',
+				'No API key configured on the site. Open the WP MCP admin menu and generate one.',
 				array( 'status' => 500 )
 			);
 		}

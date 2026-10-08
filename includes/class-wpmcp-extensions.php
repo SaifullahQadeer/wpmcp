@@ -31,7 +31,7 @@ class WPMCP_Extensions {
 	public static function run( $name, $args ) {
 		if ( ! in_array( $name, self::tool_names(), true ) ) { return new WP_Error( 'wpmcp_tool', 'Unknown extension tool.' ); }
 		if ( ! WPMCP_Auth::$header_authenticated || ! is_ssl() ) { return new WP_Error( 'wpmcp_secure_auth', 'Extension tools require HTTPS and a valid x-api-key or Bearer header.' ); }
-		if ( '1' !== (string) get_option( 'wpmcp_extensions_enabled', '0' ) || is_multisite() ) { return new WP_Error( 'wpmcp_extensions_disabled', 'Enable extension access in Settings → WP MCP. Multisite is not supported.' ); }
+		if ( '1' !== (string) get_option( 'wpmcp_extensions_enabled', '0' ) || is_multisite() ) { return new WP_Error( 'wpmcp_extensions_disabled', 'Enable extension access in the WP MCP admin menu. Multisite is not supported.' ); }
 		$kind = isset( $args['kind'] ) ? $args['kind'] : '';
 		if ( ! in_array( $kind, array( 'plugin', 'theme' ), true ) ) { return new WP_Error( 'wpmcp_kind', 'kind must be plugin or theme.' ); }
 		$owner = get_user_by( 'id', (int) get_option( 'wpmcp_extension_owner', 0 ) );

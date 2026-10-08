@@ -15,13 +15,14 @@ post types, media, taxonomies and Elementor layouts. No local software needed.
 Deactivate the previous plugin before installing and activating this version.
 The entry file is now wp-mcp.php, and all internal identifiers use WPMCP/wpmcp.
 Activation creates new settings and a new API key; previous settings and keys
-are not migrated. Review the enabled setting under Settings -> WP MCP.
+are not migrated. Review the enabled setting in the WP MCP admin menu.
 Copy the new connection URL into each MCP client. Previous endpoint URLs,
 custom header names, query parameters, and filter names are no longer supported.
 
 == Connecting ==
 
-Settings -> WP MCP shows both URLs ready to paste.
+The WP MCP admin menu (also linked as Settings on the Plugins screen) shows
+both URLs ready to paste.
 
 Recommended -- key in a request header:
     https://SITE/wp-json/wpmcp/v1/mcp
@@ -82,7 +83,7 @@ No hosting access, standalone rescue endpoint, or full-site backup is provided.
 == Plugin and theme access ==
 
 Version 2.2.0 adds opt-in extension tools. Existing content access is unchanged.
-Save extension permissions in Settings -> WP MCP as an administrator. The key
+Save extension permissions in the WP MCP admin menu as an administrator. The key
 delegates these operations to that administrator; permissions are rechecked
 on every call. Installation and editing have separate switches, off by default.
 HTTPS and header authentication are mandatory for all extension tools.
@@ -127,6 +128,8 @@ its own or alongside elements.
 == Changelog ==
 
 = Unreleased =
+* WP MCP now has its own top-level admin menu instead of a Settings submenu,
+  plus a Settings link before Deactivate on the Plugins screen.
 * Missing or invalid API keys return 403 on every route, not 401.
 * New installs start with API keys in URLs disabled; existing sites are unchanged.
 * Ten invalid keys from one address within 15 minutes block further attempts
