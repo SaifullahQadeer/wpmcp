@@ -126,6 +126,13 @@ its own or alongside elements.
 
 == Changelog ==
 
+= Unreleased =
+* Missing or invalid API keys return 403 on every route, not 401.
+* New installs start with API keys in URLs disabled; existing sites are unchanged.
+* Ten invalid keys from one address within 15 minutes block further attempts
+  from it for 15 minutes (HTTP 429). Behind a proxy or CDN, return the real
+  client address from the wpmcp_client_ip filter.
+
 = 2.3.0 =
 * PHP and JSON preflight validation, including escaped/missing PHP tag checks.
 * Dry-run validation and required pre-edit snapshots (ten per file).

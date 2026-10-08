@@ -13,6 +13,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 class WPMCP_Auth {
+	const MAX_FAILURES   = 10;
+	const FAILURE_WINDOW = 900; // Seconds; also the lockout length after the last failure.
+
 	public static $header_authenticated = false;
 
 	/**
@@ -97,7 +100,17 @@ class WPMCP_Auth {
 			);
 		}
 
+		$fail_key = self::fail_key();
+		if ( (int) get_transient( $fail_key ) >= self::MAX_FAILURES ) {
+			return new WP_Error(
+				'wpmcp_rate_limited',
+				'Too many invalid API keys from this address. Try again in a few minutes.',
+				array( 'status' => 429 )
+			);
+		}
+
 		if ( ! hash_equals( $stored, $provided ) ) {
+			set_transient( $fail_key, (int) get_transient( $fail_key ) + 1, self::FAILURE_WINDOW );
 			return new WP_Error(
 				'wpmcp_bad_key',
 				'Invalid API key.',
@@ -105,7 +118,23 @@ class WPMCP_Auth {
 			);
 		}
 
+		delete_transient( $fail_key );
 		self::$header_authenticated = $from_header;
 		return true;
+	}
+
+	/**
+	 * Transient name that counts failed key attempts for the calling address.
+	 *
+	 * Uses REMOTE_ADDR only. Behind a reverse proxy or CDN, return the real
+	 * client address from the wpmcp_client_ip filter, otherwise every caller
+	 * shares one counter.
+	 *
+	 * @return string
+	 */
+	private static function fail_key() {
+		$ip = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '';
+		$ip = (string) apply_filters( 'wpmcp_client_ip', $ip );
+		return 'wpmcp_fail_' . md5( $ip );
 	}
 }

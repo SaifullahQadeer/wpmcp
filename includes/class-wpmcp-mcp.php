@@ -100,7 +100,7 @@ class WPMCP_MCP {
 		}
 
 		$result = WPMCP_Auth::check( $request );
-		if ( is_wp_error( $result ) ) {
+		if ( is_wp_error( $result ) && 'wpmcp_rate_limited' !== $result->get_error_code() ) {
 			$result->add_data( array( 'status' => 403 ) );
 		}
 		return $result;
