@@ -3,7 +3,7 @@ Author: Saifullah Qadeer
 Requires at least: 5.6
 Requires PHP: 7.4
 Tested with Elementor: 4.x
-Stable tag: 2.9.1
+Stable tag: 2.9.2
 License: GPL-2.0-or-later
 
 Turns a WordPress site into its own remote MCP server, so Claude (web, Desktop,
@@ -137,7 +137,15 @@ With no marker, "elements" replaces the entire layout (v1.x behaviour).
 wp_set_elementor also accepts "page_settings" for _elementor_page_settings, on
 its own or alongside elements.
 
+== Fonts ==
+
+The admin screen bundles the Inter typeface (SIL Open Font License 1.1, see
+assets/fonts/Inter-LICENSE.txt). Nothing is loaded from external servers.
+
 == Changelog ==
+
+= 2.9.2 =
+* Cleaner typography: the admin screen now uses the Inter typeface, bundled with the plugin (no external font requests), with regular, medium, semibold and bold weights used consistently.
 
 = 2.9.1 =
 * Removed the headline banner from the Connect tab so the connect panel is the first thing you see.
