@@ -96,7 +96,13 @@ class WPMCP_Admin {
 				update_option( 'wpmcp_' . $setting, $value );
 			}
 			update_option( 'wpmcp_extension_owner', get_current_user_id() );
+			$key_level = isset( $_POST['wpmcp_key_level'] ) ? sanitize_key( wp_unslash( $_POST['wpmcp_key_level'] ) ) : 'full';
+			update_option( 'wpmcp_key_level', WPMCP_Permissions::valid( $key_level ) ? $key_level : 'full' );
 			$message = 'Settings saved.';
+		} elseif ( 'set_level' === $action ) {
+			$grant   = isset( $_POST['wpmcp_grant'] ) ? sanitize_key( wp_unslash( $_POST['wpmcp_grant'] ) ) : '';
+			$level   = isset( $_POST['wpmcp_level'] ) ? sanitize_key( wp_unslash( $_POST['wpmcp_level'] ) ) : '';
+			$message = WPMCP_OAuth::set_grant_level( $grant, $level ) ? 'Access changed to "' . WPMCP_Permissions::label( $level ) . '". It applies on the app\'s next request.' : 'Could not change that connection.';
 		} elseif ( 'revoke' === $action ) {
 			$grant   = isset( $_POST['wpmcp_grant'] ) ? sanitize_key( wp_unslash( $_POST['wpmcp_grant'] ) ) : '';
 			$message = WPMCP_OAuth::revoke_grant( $grant ) ? 'App disconnected. Its access stopped immediately.' : 'That connection was already removed.';
@@ -249,9 +255,11 @@ class WPMCP_Admin {
 		?>
 		<section class="wpmcp-panel"><div class="wpmcp-panel-head"><h2><?php echo $this->icon( 'users' ); ?>Connected apps</h2><p>Apps that signed in through OAuth. Revoking cuts access immediately.</p></div>
 		<?php if ( ! $grants ) : ?><p class="wpmcp-empty">No apps connected yet. After you approve a connection it appears here.</p><?php else : ?>
-		<table class="wpmcp-table"><thead><tr><th>App</th><th>Acts as</th><th>Connected</th><th>Last used</th><th></th></tr></thead><tbody>
+		<table class="wpmcp-table"><thead><tr><th>App</th><th>Acts as</th><th>Access</th><th>Connected</th><th>Last used</th><th></th></tr></thead><tbody>
 		<?php foreach ( $grants as $id => $g ) : $user = get_userdata( (int) $g['user_id'] ); ?>
-			<tr><td><strong><?php echo esc_html( $g['client_name'] ); ?></strong></td><td><?php echo esc_html( $user ? $user->display_name : 'Unknown user' ); ?></td><td><?php echo esc_html( wp_date( get_option( 'date_format' ), (int) $g['created'] ) ); ?></td><td><?php echo esc_html( human_time_diff( (int) $g['last_used'] ) . ' ago' ); ?></td>
+			<tr><td><strong><?php echo esc_html( $g['client_name'] ); ?></strong></td><td><?php echo esc_html( $user ? $user->display_name : 'Unknown user' ); ?></td>
+			<td><form method="post" class="wpmcp-level-form"><?php $this->form_fields( 'set_level', 'connect' ); ?><input type="hidden" name="wpmcp_grant" value="<?php echo esc_attr( $id ); ?>" /><select name="wpmcp_level" data-autosubmit aria-label="Access level for <?php echo esc_attr( $g['client_name'] ); ?>"><?php foreach ( WPMCP_Permissions::levels() as $key => $info ) : ?><option value="<?php echo esc_attr( $key ); ?>"<?php echo WPMCP_Permissions::normalize( isset( $g['level'] ) ? $g['level'] : 'full' ) === $key ? ' selected' : ''; ?>><?php echo esc_html( $info[0] ); ?></option><?php endforeach; ?></select></form></td>
+			<td><?php echo esc_html( wp_date( get_option( 'date_format' ), (int) $g['created'] ) ); ?></td><td><?php echo esc_html( human_time_diff( (int) $g['last_used'] ) . ' ago' ); ?></td>
 			<td class="wpmcp-right"><form method="post"><?php $this->form_fields( 'revoke', 'connect' ); ?><input type="hidden" name="wpmcp_grant" value="<?php echo esc_attr( $id ); ?>" /><button class="button" data-confirm="Disconnect this app? It stops working immediately.">Revoke</button></form></td></tr>
 		<?php endforeach; ?></tbody></table>
 		<?php endif; ?>
@@ -293,7 +301,7 @@ class WPMCP_Admin {
 			if ( $enabled ) { $on++; }
 		}
 		?>
-		<section class="wpmcp-panel"><div class="wpmcp-panel-head"><h2><?php echo $this->icon( 'tools' ); // phpcs:ignore WordPress.Security.EscapeOutput ?>Tools</h2><p><?php echo (int) $on; ?> of <?php echo (int) count( $specs ); ?> are on. Hover a tool to see what it does. Plugin and theme tools stay off until you turn them on in Security.</p></div>
+		<section class="wpmcp-panel"><div class="wpmcp-panel-head"><h2><?php echo $this->icon( 'tools' ); // phpcs:ignore WordPress.Security.EscapeOutput ?>Tools</h2><p><?php echo (int) $on; ?> of <?php echo (int) count( $specs ); ?> are on. Hover a tool to see what it does. Each app’s access level (Read only, Read and edit, Full access) decides which of these it can use. Plugin and theme tools stay off until you turn them on in Security.</p></div>
 		<?php foreach ( $groups as $group => $names ) : ?>
 			<h3 class="wpmcp-group"><?php echo esc_html( $group ); ?></h3>
 			<ul class="wpmcp-toollist">
@@ -367,6 +375,7 @@ class WPMCP_Admin {
 		<form method="post"><?php $this->form_fields( 'save', 'security' ); ?>
 		<section class="wpmcp-panel"><div class="wpmcp-panel-head"><h2><?php echo $this->icon( 'shield' ); ?>Access</h2><p>Changes apply to every connected app and API key.</p></div>
 		<?php $this->toggle( 'enabled', 'Enable MCP server', 'Allow authenticated apps to use this site’s tools. Turn off to pause everything.', '1' ); $this->toggle( 'oauth_enabled', 'Allow sign-in with OAuth', 'Lets AI apps connect with a Connect button and your approval, with no key to copy. Requires HTTPS.', '1' ); $this->toggle( 'allow_url_key', 'Allow API keys in URLs', 'For apps that cannot send headers. Headers keep keys out of server logs, so leave this off if you can.', '1' ); ?>
+		<div class="wpmcp-select-row"><label for="wpmcp_key_level"><strong>Access for the API key</strong><small>What an app using the API key may do. Apps that sign in with OAuth get their own access level when you approve them.</small></label><select id="wpmcp_key_level" name="wpmcp_key_level"><?php foreach ( WPMCP_Permissions::levels() as $key => $info ) : ?><option value="<?php echo esc_attr( $key ); ?>"<?php echo WPMCP_Permissions::normalize( get_option( 'wpmcp_key_level', 'full' ) ) === $key ? ' selected' : ''; ?>><?php echo esc_html( $info[0] ); ?></option><?php endforeach; ?></select></div>
 		</section>
 		<section class="wpmcp-panel"><div class="wpmcp-panel-head"><h2><?php echo $this->icon( 'layers' ); ?>Plugins & themes</h2><p>Extension tools use the WordPress permissions of the administrator who saves these settings. They need HTTPS and a signed-in app or an API key header. Multisite is not supported.</p></div>
 		<?php $this->toggle( 'extensions_enabled', 'Allow extension access', 'List installed plugins and themes and read their editable files.' ); $this->toggle( 'allow_install', 'Allow installation', 'Install from WordPress.org. Installed extensions stay inactive.' ); $this->toggle( 'allow_edit', 'Allow code editing', 'Edit existing source files. Changes can break the site, so use a backup or staging site.' ); $this->toggle( 'allow_activate', 'Allow activation', 'Activate or deactivate installed plugins and switch the theme. WP MCP itself cannot be deactivated this way.' ); ?>

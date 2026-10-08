@@ -21,6 +21,11 @@ class WPMCP_REST {
 		return WPMCP_Auth::check( $request );
 	}
 
+	/** Refuse a route whose tool is outside the caller's access level. */
+	private function guard( $tool ) {
+		return WPMCP_Permissions::allows( WPMCP_Auth::$level, $tool ) ? null : new WP_Error( 'wpmcp_level', WPMCP_Permissions::refusal( WPMCP_Auth::$level, $tool ), array( 'status' => 403 ) );
+	}
+
 	/** Convert a Core return value (array|WP_Error) into a REST response. */
 	private function respond( $result, $success_status = 200 ) {
 		if ( is_wp_error( $result ) ) {
@@ -127,14 +132,23 @@ class WPMCP_REST {
 	/* Callbacks -> Core */
 
 	public function ping() {
+		if ( $denied = $this->guard( 'wp_ping' ) ) {
+			return $denied;
+		}
 		return $this->respond( WPMCP_Core::ping() );
 	}
 
 	public function list_post_types() {
+		if ( $denied = $this->guard( 'wp_list_post_types' ) ) {
+			return $denied;
+		}
 		return $this->respond( WPMCP_Core::list_post_types() );
 	}
 
 	public function list_content( $request ) {
+		if ( $denied = $this->guard( 'wp_list_content' ) ) {
+			return $denied;
+		}
 		return $this->respond( WPMCP_Core::list_content( $request['type'], array(
 			'per_page' => $request->get_param( 'per_page' ),
 			'page'     => $request->get_param( 'page' ),
@@ -144,25 +158,40 @@ class WPMCP_REST {
 	}
 
 	public function get_content( $request ) {
+		if ( $denied = $this->guard( 'wp_get_content' ) ) {
+			return $denied;
+		}
 		$include = $request->get_param( 'include_elementor' );
 		$include = ( null === $include ) ? true : filter_var( $include, FILTER_VALIDATE_BOOLEAN );
 		return $this->respond( WPMCP_Core::get_content( $request['type'], (int) $request['id'], $include ) );
 	}
 
 	public function create_content( $request ) {
+		if ( $denied = $this->guard( 'wp_create_content' ) ) {
+			return $denied;
+		}
 		return $this->respond( WPMCP_Core::create_content( $request['type'], $this->body( $request ) ), 201 );
 	}
 
 	public function update_content( $request ) {
+		if ( $denied = $this->guard( 'wp_update_content' ) ) {
+			return $denied;
+		}
 		return $this->respond( WPMCP_Core::update_content( $request['type'], (int) $request['id'], $this->body( $request ) ) );
 	}
 
 	public function delete_content( $request ) {
+		if ( $denied = $this->guard( 'wp_delete_content' ) ) {
+			return $denied;
+		}
 		$force = filter_var( $request->get_param( 'force' ), FILTER_VALIDATE_BOOLEAN );
 		return $this->respond( WPMCP_Core::delete_content( $request['type'], (int) $request['id'], $force ) );
 	}
 
 	public function get_elementor( $request ) {
+		if ( $denied = $this->guard( 'wp_get_elementor' ) ) {
+			return $denied;
+		}
 		return $this->respond( WPMCP_Core::get_elementor( (int) $request['id'], array(
 			'summary' => filter_var( $request->get_param( 'summary' ), FILTER_VALIDATE_BOOLEAN ),
 			'index'   => $request->get_param( 'index' ),
@@ -171,6 +200,9 @@ class WPMCP_REST {
 	}
 
 	public function set_elementor( $request ) {
+		if ( $denied = $this->guard( 'wp_set_elementor' ) ) {
+			return $denied;
+		}
 		$body          = $this->body( $request );
 		$page_settings = isset( $body['page_settings'] ) && is_array( $body['page_settings'] ) ? $body['page_settings'] : null;
 		$elements      = null;
@@ -185,6 +217,9 @@ class WPMCP_REST {
 	}
 
 	public function list_media( $request ) {
+		if ( $denied = $this->guard( 'wp_list_media' ) ) {
+			return $denied;
+		}
 		return $this->respond( WPMCP_Core::list_media( array(
 			'per_page' => $request->get_param( 'per_page' ),
 			'page'     => $request->get_param( 'page' ),
@@ -193,14 +228,23 @@ class WPMCP_REST {
 	}
 
 	public function upload_media( $request ) {
+		if ( $denied = $this->guard( 'wp_upload_media' ) ) {
+			return $denied;
+		}
 		return $this->respond( WPMCP_Core::upload_media( $this->body( $request ) ), 201 );
 	}
 
 	public function list_terms( $request ) {
+		if ( $denied = $this->guard( 'wp_list_terms' ) ) {
+			return $denied;
+		}
 		return $this->respond( WPMCP_Core::list_terms( $request['taxonomy'] ) );
 	}
 
 	public function create_term( $request ) {
+		if ( $denied = $this->guard( 'wp_create_term' ) ) {
+			return $denied;
+		}
 		return $this->respond( WPMCP_Core::create_term( $request['taxonomy'], $this->body( $request ) ), 201 );
 	}
 }

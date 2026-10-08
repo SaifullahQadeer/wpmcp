@@ -276,13 +276,14 @@ class WPMCP_OAuth {
 	}
 
 	/** Turn an approved request into a one-time code and the redirect URL. */
-	public static function approve( $request_id, $user_id ) {
+	public static function approve( $request_id, $user_id, $level = 'edit' ) {
 		$req = get_transient( 'wpmcp_authreq_' . $request_id );
 		delete_transient( 'wpmcp_authreq_' . $request_id );
 		if ( ! is_array( $req ) || (int) $req['user_id'] !== (int) $user_id ) { return false; }
 		$code = self::random( 24 );
 		set_transient( 'wpmcp_code_' . self::digest( $code ), array(
 			'client_id' => $req['client_id'], 'redirect_uri' => $req['redirect_uri'], 'user_id' => (int) $user_id, 'challenge' => $req['challenge'],
+			'level' => WPMCP_Permissions::valid( $level ) ? $level : 'edit',
 		), self::CODE_TTL );
 		return self::redirect_with( $req['redirect_uri'], array( 'code' => $code, 'state' => $req['state'] ) );
 	}
@@ -299,7 +300,8 @@ class WPMCP_OAuth {
 		check_admin_referer( 'wpmcp_authorize' );
 		$id      = sanitize_key( wp_unslash( $_POST['wpmcp_request'] ) );
 		$approve = 'approve' === $_POST['wpmcp_decision'];
-		$url     = $approve ? self::approve( $id, get_current_user_id() ) : self::deny( $id, get_current_user_id() );
+		$level   = isset( $_POST['wpmcp_level'] ) ? sanitize_key( wp_unslash( $_POST['wpmcp_level'] ) ) : 'edit';
+		$url     = $approve ? self::approve( $id, get_current_user_id(), $level ) : self::deny( $id, get_current_user_id() );
 		if ( ! $url ) { wp_die( 'This connection request expired. Start the connection again from your AI app.', 'Request expired', array( 'response' => 400 ) ); }
 		wp_redirect( $url ); // phpcs:ignore WordPress.Security.SafeRedirect -- redirect_uri was matched against the client's registered list.
 		exit;
@@ -321,8 +323,7 @@ class WPMCP_OAuth {
 		?>
 		<div class="card" style="max-width:560px;padding:1.5em 2em">
 			<p style="font-size:15px"><strong><?php echo esc_html( $checked['client']['name'] ); ?></strong> wants to connect to this site.</p>
-			<p>It will be able to read and change <strong>pages, posts, media, categories and Elementor layouts</strong> as <strong><?php echo esc_html( $user->display_name ); ?></strong>.
-			<?php if ( '1' === (string) get_option( 'wpmcp_extensions_enabled', '0' ) ) : ?>Plugin and theme tools are also available because you enabled them in WP MCP.<?php endif; ?></p>
+			<p>It will act as <strong><?php echo esc_html( $user->display_name ); ?></strong>. Choose what it may do. You can change this later in WP MCP.</p>
 			<?php if ( ! self::is_known_redirect( $checked['redirect_uri'] ) ) : ?>
 				<div class="notice notice-warning inline"><p><strong>Unrecognized app.</strong> It will send you to <code><?php echo esc_html( $host ? $host : $checked['redirect_uri'] ); ?></code>, which is not a well-known AI service. Anyone can register an app under any name, so approve only if you started this connection yourself.</p></div>
 			<?php else : ?>
@@ -331,6 +332,8 @@ class WPMCP_OAuth {
 			<form method="post" action="<?php echo esc_url( add_query_arg( 'page', self::PAGE, admin_url( 'admin.php' ) ) ); ?>">
 				<?php wp_nonce_field( 'wpmcp_authorize' ); ?>
 				<input type="hidden" name="wpmcp_request" value="<?php echo esc_attr( $request ); ?>" />
+				<fieldset style="border:0;margin:16px 0 20px;padding:0"><legend style="font-weight:600;margin-bottom:8px">What may it do?</legend>
+				<?php foreach ( WPMCP_Permissions::levels() as $key => $info ) : ?><label style="display:block;margin:0 0 10px"><input type="radio" name="wpmcp_level" value="<?php echo esc_attr( $key ); ?>"<?php echo WPMCP_Permissions::DEFAULT_APP === $key ? ' checked' : ''; ?> /> <strong><?php echo esc_html( $info[0] ); ?></strong><br /><span class="description" style="margin-left:24px;display:block"><?php echo esc_html( $info[1] ); ?></span></label><?php endforeach; ?></fieldset>
 				<button class="button button-primary button-hero" name="wpmcp_decision" value="approve">Approve</button>
 				<button class="button button-hero" name="wpmcp_decision" value="deny">Cancel</button>
 			</form>
@@ -367,7 +370,7 @@ class WPMCP_OAuth {
 				return self::oauth_error( 400, 'invalid_grant', 'The code is invalid, expired, or does not match the request.' );
 			}
 			$grant_id = self::random( 12 );
-			return array( 200, self::issue_tokens( $grant_id, $client_id, $clients[ $client_id ]['name'], (int) $data['user_id'], true ) );
+			return array( 200, self::issue_tokens( $grant_id, $client_id, $clients[ $client_id ]['name'], (int) $data['user_id'], true, isset( $data['level'] ) ? $data['level'] : 'edit' ) );
 		}
 
 		if ( 'refresh_token' === $type ) {
@@ -388,7 +391,7 @@ class WPMCP_OAuth {
 	}
 
 	/** Create (or rotate) tokens for a grant. */
-	private static function issue_tokens( $grant_id, $client_id, $client_name, $user_id, $new ) {
+	private static function issue_tokens( $grant_id, $client_id, $client_name, $user_id, $new, $level = 'full' ) {
 		$grants  = self::grants();
 		$access  = 'wpmcp_at_' . self::random( 24 );
 		$refresh = 'wpmcp_rt_' . self::random( 24 );
@@ -400,6 +403,7 @@ class WPMCP_OAuth {
 			'user_id'      => $user_id,
 			'created'      => $new ? time() : $grants[ $grant_id ]['created'],
 			'last_used'    => time(),
+			'level'        => $new ? WPMCP_Permissions::normalize( $level ) : ( isset( $grants[ $grant_id ]['level'] ) ? $grants[ $grant_id ]['level'] : 'full' ),
 			'refresh_key'  => 'wpmcp_rt_' . self::digest( $refresh ),
 		);
 		self::save_grants( $grants );
@@ -423,7 +427,7 @@ class WPMCP_OAuth {
 			$grants[ $data['grant'] ]['last_used'] = time();
 			self::save_grants( $grants );
 		}
-		return array( 'user_id' => (int) $user->ID, 'grant' => $data['grant'], 'name' => (string) $grants[ $data['grant'] ]['client_name'] );
+		return array( 'user_id' => (int) $user->ID, 'grant' => $data['grant'], 'name' => (string) $grants[ $data['grant'] ]['client_name'], 'level' => WPMCP_Permissions::normalize( isset( $grants[ $data['grant'] ]['level'] ) ? $grants[ $data['grant'] ]['level'] : 'full' ) );
 	}
 
 	public static function revoke_token( $token ) {
@@ -439,6 +443,15 @@ class WPMCP_OAuth {
 		$grants = self::grants();
 		uasort( $grants, function ( $a, $b ) { return $b['last_used'] <=> $a['last_used']; } );
 		return $grants;
+	}
+
+	/** Change what a connected app may do. Takes effect on its next request. */
+	public static function set_grant_level( $grant_id, $level ) {
+		$grants = self::grants();
+		if ( ! isset( $grants[ $grant_id ] ) || ! WPMCP_Permissions::valid( $level ) ) { return false; }
+		$grants[ $grant_id ]['level'] = $level;
+		self::save_grants( $grants );
+		return true;
 	}
 
 	public static function revoke_grant( $grant_id ) {

@@ -96,3 +96,9 @@ function wpmcpWatch(link) {
     } catch (_) { /* Keep waiting; the next tick retries. */ }
   }, 2500);
 }
+
+// A level picker in the connected apps table saves as soon as it changes.
+document.addEventListener('change', (event) => {
+  const select = event.target.closest('select[data-autosubmit]');
+  if (select && select.form) select.form.submit();
+});

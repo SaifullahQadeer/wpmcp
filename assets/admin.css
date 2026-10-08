@@ -215,3 +215,9 @@ body.toplevel_page_wp-mcp #wpbody-content .notice:not(.wpmcp-notice),body.toplev
 .wpmcp-compat-icon{display:grid;place-items:center;flex:none;width:34px;height:34px;border-radius:9px;background:var(--card);border:1px solid var(--line)}
 .wpmcp-compat .wpmcp-badge{flex:none;max-width:42%;overflow:hidden;text-overflow:ellipsis}
 @media(max-width:900px){.wpmcp-health.is-grid,.wpmcp-compat-grid{grid-template-columns:minmax(0,1fr)}}
+
+/* Access levels */
+.wpmcp-level-form select,.wpmcp-select-row select{border:1.5px solid var(--ink);border-radius:10px;min-height:36px;padding:0 30px 0 12px;background-color:var(--card);font-weight:600;font-size:13px;color:var(--ink);box-shadow:none}
+.wpmcp-select-row{display:flex;justify-content:space-between;align-items:center;gap:20px;padding:16px 0;border-top:1px solid #f1ede6}
+.wpmcp-select-row label{display:block}.wpmcp-select-row strong{display:block;font-size:13px}
+.wpmcp-select-row small{display:block;color:var(--muted);line-height:1.55;margin-top:3px;font-size:12px;max-width:520px}

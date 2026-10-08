@@ -3,7 +3,7 @@ Author: Saifullah Qadeer
 Requires at least: 5.6
 Requires PHP: 7.4
 Tested with Elementor: 4.x
-Stable tag: 2.10.2
+Stable tag: 2.11.0
 License: GPL-2.0-or-later
 
 Turns a WordPress site into its own remote MCP server, so Claude (web, Desktop,
@@ -50,6 +50,21 @@ wp_read_extension_file, wp_edit_extension_file, wp_list_file_backups,
 wp_restore_extension_file, wp_set_extension_active, wp_list_history, wp_rollback,
 wp_list_block_types, wp_get_blocks, wp_set_blocks, wp_get_divi, wp_set_divi,
 wp_clear_cache, wp_get_settings, wp_update_settings.
+
+== Access levels ==
+
+Each connected app has an access level, chosen when you approve it and changeable later in
+Connected apps:
+
+    Read only      look at content, layouts, settings and history; change nothing (12 tools)
+    Read and edit  also create and edit content, layouts and media, clear caches and undo (21 tools)
+    Full access    everything that is switched on, including delete, settings and plugin tools (all)
+
+Approval defaults to Read and edit. An app is only offered the tools its level allows, and a
+refused call explains which level is needed. Undoing a change needs the level that could have
+made it. The API key has its own level under Security; it stays at Full access unless you lower
+it, and connections made before levels existed keep Full access. A tool that has not been
+placed in a level is available at Full access only.
 
 == Page builders, cache and settings ==
 
@@ -177,6 +192,11 @@ The admin screen bundles the Inter typeface (SIL Open Font License 1.1, see
 assets/fonts/Inter-LICENSE.txt). Nothing is loaded from external servers.
 
 == Changelog ==
+
+= 2.11.0 =
+* Access levels for connected apps: Read only, Read and edit, or Full access. Choose one when you approve an app (Read and edit is preselected) and change it any time in Connected apps; it applies on the app's next request.
+* Apps are only offered the tools their level allows, and refused calls say which level is needed. Undoing a change needs the level that could have made it.
+* The API key has its own level in the Security tab. Existing connections and the API key stay at Full access until you change them.
 
 = 2.10.2 =
 * New Works with section on the Connect tab: Gutenberg, Elementor 3 and 4, Divi 4 and 5, content, caches and settings, with what is active on this site.

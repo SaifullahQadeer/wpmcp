@@ -273,13 +273,15 @@ class WPMCP_History {
 	/**
 	 * Undo one history entry.
 	 *
-	 * @param bool $files Whether file edits may be rolled back (admin screen only).
+	 * @param bool   $files Whether file edits may be rolled back (admin screen only).
+	 * @param string $level Access level of whoever asks: undoing a change needs the level that could have made it.
 	 * @return array|WP_Error {message}
 	 */
-	public static function rollback( $id, $force = false, $files = false ) {
+	public static function rollback( $id, $force = false, $files = false, $level = 'full' ) {
 		$row  = self::get( $id );
 		$why  = self::blocker( $row );
 		if ( '' !== $why ) { return new WP_Error( 'wpmcp_no_rollback', $why ); }
+		if ( ! WPMCP_Permissions::allows( $level, $row['tool'] ) ) { return new WP_Error( 'wpmcp_level', WPMCP_Permissions::refusal( $level, $row['tool'] ) ); }
 		$data = json_decode( $row['before_data'], true );
 		if ( ! is_array( $data ) || empty( $data['op'] ) ) { return new WP_Error( 'wpmcp_no_rollback', 'The saved undo information is damaged.' ); }
 		$post_id = (int) $row['object_id'];

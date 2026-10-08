@@ -292,7 +292,7 @@ class WPMCP_MCP {
 				) );
 
 			case 'tools/list':
-				$result = array( 'tools' => self::tools_spec() );
+				$result = array( 'tools' => WPMCP_Permissions::filter( self::tools_spec(), WPMCP_Auth::$level ) );
 				if ( $this->is_stateless_rev() ) {
 					$result['ttlMs']      = 300000;
 					$result['cacheScope'] = 'private';
@@ -347,6 +347,10 @@ class WPMCP_MCP {
 	private function handle_tool_call( $id, $params ) {
 		$name = isset( $params['name'] ) ? (string) $params['name'] : '';
 		$args = isset( $params['arguments'] ) && is_array( $params['arguments'] ) ? $params['arguments'] : array();
+
+		if ( ! WPMCP_Permissions::allows( WPMCP_Auth::$level, $name ) ) {
+			return $this->rpc_result( $id, $this->tool_error( WPMCP_Permissions::refusal( WPMCP_Auth::$level, $name ) ) );
+		}
 
 		$result = $this->run_tool( $name, $args );
 
@@ -551,7 +555,7 @@ class WPMCP_MCP {
 				if ( ! isset( $args['id'] ) ) {
 					return new WP_Error( 'wpmcp_missing_arg', 'Missing "id".' );
 				}
-				return WPMCP_History::rollback( (int) $args['id'], ! empty( $args['force'] ), false );
+				return WPMCP_History::rollback( (int) $args['id'], ! empty( $args['force'] ), false, WPMCP_Auth::$level );
 
 			default:
 				return new WP_Error( 'wpmcp_unknown_tool', 'Unknown tool: ' . $name );
