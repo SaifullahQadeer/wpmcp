@@ -30,6 +30,8 @@ class WPMCP_Updater {
 	 * @return array|null
 	 */
 	private function release() {
+		// "Check Again" on Dashboard -> Updates bypasses the cache.
+		if ( is_admin() && isset( $_GET['force-check'] ) && current_user_can( 'update_plugins' ) ) { delete_site_transient( self::CACHE ); }
 		$cached = get_site_transient( self::CACHE );
 		if ( false !== $cached ) { return $cached ? $cached : null; }
 
@@ -40,7 +42,7 @@ class WPMCP_Updater {
 
 		$tag = is_array( $data ) && ! empty( $data['tag_name'] ) && is_string( $data['tag_name'] ) ? $data['tag_name'] : '';
 		if ( '' === $tag || ! preg_match( '/^[vV]?(\d+(?:\.\d+){1,3}(?:-[0-9A-Za-z.-]+)?)$/', $tag, $m ) ) {
-			set_site_transient( self::CACHE, array(), HOUR_IN_SECONDS ); // Retry in an hour, not on every page load.
+			set_site_transient( self::CACHE, array(), 15 * MINUTE_IN_SECONDS ); // Back off briefly, not on every page load.
 			return null;
 		}
 
@@ -59,7 +61,7 @@ class WPMCP_Updater {
 			'notes'     => isset( $data['body'] ) && is_string( $data['body'] ) ? $data['body'] : '',
 			'published' => isset( $data['published_at'] ) ? (string) $data['published_at'] : '',
 		);
-		set_site_transient( self::CACHE, $release, 6 * HOUR_IN_SECONDS );
+		set_site_transient( self::CACHE, $release, HOUR_IN_SECONDS );
 		return $release;
 	}
 
