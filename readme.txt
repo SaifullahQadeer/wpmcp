@@ -3,7 +3,7 @@ Author: Saifullah Qadeer
 Requires at least: 5.6
 Requires PHP: 7.4
 Tested with Elementor: 4.x
-Stable tag: 2.6.1
+Stable tag: 2.6.2
 License: GPL-2.0-or-later
 
 Turns a WordPress site into its own remote MCP server, so Claude (web, Desktop,
@@ -126,6 +126,9 @@ wp_set_elementor also accepts "page_settings" for _elementor_page_settings, on
 its own or alongside elements.
 
 == Changelog ==
+
+= 2.6.2 =
+* After you click Connect with Claude, the WP MCP page watches for the connection to finish, tries to close the Claude tab it opened, and reloads with a Claude is connected notice and the Connected apps list updated.
 
 = 2.6.1 =
 * Connect with Claude is now one button: it opens Claude's add-connector dialog with this site's name and URL already filled in (Anthropic's documented install link), including a link for Team and Enterprise owners. The server URL moved under Manual setup.

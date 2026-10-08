@@ -7,6 +7,7 @@ class WPMCP_Admin {
 		add_action( 'admin_init', array( $this, 'handle_actions' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'assets' ) );
 		add_action( 'admin_init', array( $this, 'handle_update_check' ) );
+		add_action( 'wp_ajax_wpmcp_status', array( $this, 'ajax_status' ) );
 		add_action( 'admin_notices', array( $this, 'update_notice' ) );
 		add_filter( 'plugin_action_links_' . plugin_basename( WPMCP_PLUGIN_FILE ), array( $this, 'action_links' ) );
 	}
@@ -75,6 +76,18 @@ class WPMCP_Admin {
 	private function toggle( $key, $title, $description, $default = '0' ) {
 		?><label class="wpmcp-toggle"><input type="checkbox" name="wpmcp_<?php echo esc_attr( $key ); ?>" value="1" <?php checked( '1', get_option( 'wpmcp_' . $key, $default ) ); ?> /><span><strong><?php echo esc_html( $title ); ?></strong><small><?php echo esc_html( $description ); ?></small></span></label><?php
 	}
+	/** Connection count and newest connection time, so the page that started a connect can notice it finished. */
+	private function connection_snapshot() {
+		$grants  = WPMCP_OAuth::list_grants();
+		$created = $grants ? max( array_map( 'intval', array_column( $grants, 'created' ) ) ) : 0;
+		return array( 'count' => count( $grants ), 'latest' => $created );
+	}
+	public function ajax_status() {
+		check_ajax_referer( 'wpmcp_status' );
+		if ( ! current_user_can( 'manage_options' ) ) { wp_send_json_error( null, 403 ); }
+		wp_send_json_success( $this->connection_snapshot() );
+	}
+
 	/** Tool picker: choose an AI app, then follow its one-click steps. */
 	private function render_connect( $url ) {
 		$name   = 'wordpress';
@@ -100,7 +113,9 @@ class WPMCP_Admin {
 		</div>
 
 		<div class="wpmcp-steps" data-steps="claude">
-			<p><a class="button button-primary button-hero" href="<?php echo esc_url( $claude ); ?>" target="_blank" rel="noopener">Connect with Claude</a></p>
+			<?php $snap = $this->connection_snapshot(); ?>
+			<p><a class="button button-primary button-hero" id="wpmcp-connect-claude" href="<?php echo esc_url( $claude ); ?>" target="_blank" rel="noopener" data-status-url="<?php echo esc_url( admin_url( 'admin-ajax.php?action=wpmcp_status&_wpnonce=' . wp_create_nonce( 'wpmcp_status' ) ) ); ?>" data-count="<?php echo (int) $snap['count']; ?>" data-latest="<?php echo (int) $snap['latest']; ?>">Connect with Claude</a></p>
+			<p id="wpmcp-connect-status" class="wpmcp-connect-status" role="status" hidden></p>
 			<p>Claude opens with this site already filled in. Confirm it, click <strong>Connect</strong>, then <strong>Approve</strong> on the page this site shows. Works for claude.ai and Claude Desktop.</p>
 			<p class="description">On a Claude Team or Enterprise plan? An organization owner adds it <a href="<?php echo esc_url( $claude_admin ); ?>" target="_blank" rel="noopener">here</a>, then members click Connect.</p>
 		</div>
@@ -159,6 +174,7 @@ class WPMCP_Admin {
 		<div class="wrap wpmcp">
 		<header class="wpmcp-header"><div><h1>WP MCP <span>v<?php echo esc_html( WPMCP_VERSION ); ?></span></h1><p>Connect your AI assistant. Stay in control of your WordPress site.</p></div><span class="wpmcp-status"><?php echo $enabled ? 'Server enabled' : 'Server paused'; ?></span></header>
 		<?php if ( $notice ) : ?><div class="notice notice-success"><p><?php echo esc_html( $notice ); ?></p></div><?php endif; ?>
+		<?php if ( isset( $_GET['wpmcp_connected'] ) ) : ?><div class="notice notice-success is-dismissible"><p><strong>Claude is connected.</strong> Ask Claude to run <code>wp_ping</code> to try it.</p></div><?php endif; ?>
 		<?php if ( ! is_ssl() ) : ?><div class="notice notice-warning"><p>Configure HTTPS before connecting. Extension tools require a secure request.</p></div><?php endif; ?>
 		<?php if ( ! get_option( 'permalink_structure' ) ) : ?><div class="notice notice-warning"><p>Enable pretty permalinks before using a key in the URL.</p></div><?php endif; ?>
 		<div class="wpmcp-layout"><main>
