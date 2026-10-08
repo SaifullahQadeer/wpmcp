@@ -87,9 +87,9 @@ class WPMCP_Admin {
 		<?php if ( ! is_ssl() ) : ?><div class="notice notice-warning"><p>Configure HTTPS before connecting. Extension tools require a secure request.</p></div><?php endif; ?>
 		<?php if ( ! get_option( 'permalink_structure' ) ) : ?><div class="notice notice-warning"><p>Enable pretty permalinks before using a key in the URL.</p></div><?php endif; ?>
 		<div class="wpmcp-layout"><main>
-		<section class="wpmcp-panel"><h2>Connect your assistant</h2><p>Use a custom MCP connector with API-key authentication. No OAuth sign-in is required.</p>
+		<section class="wpmcp-panel"><h2>Connect your assistant</h2><p>Add the server URL below as a custom connector in your AI app (in Claude: Settings → Connectors → Add custom connector), then click Connect and approve on the page that opens. Leave any client ID or secret fields empty. No key is needed.</p>
 		<?php $this->field( 'wpmcp-endpoint', 'Server URL', $url ); ?>
-		<div class="wpmcp-instruction"><strong>Add a request header</strong><p>Set the header name to <code>x-api-key</code> and paste the API key below as its value. Choose “No sign-in” if your client asks for an OAuth method.</p></div>
+		<div class="wpmcp-instruction"><strong>Advanced: connect with an API key instead</strong><p>For apps that cannot sign in, set the header name to <code>x-api-key</code> and paste the API key below as its value. Choose “No sign-in” if your client asks for an OAuth method.</p></div>
 		<?php $this->field( 'wpmcp-key', 'API key', $key, true ); ?>
 		<p class="description">Alternatively, send <code>Authorization: Bearer YOUR_API_KEY</code>. Anyone with this key can use enabled tools.</p>
 		<form method="post" class="wpmcp-rotate"><?php wp_nonce_field( 'wpmcp_settings' ); ?><input type="hidden" name="wpmcp_action" value="regenerate" /><button class="button" data-confirm="Rotate the key? Connected clients will need the new key.">Rotate API key</button></form>

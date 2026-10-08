@@ -3,7 +3,7 @@ Author: Saifullah Qadeer
 Requires at least: 5.6
 Requires PHP: 7.4
 Tested with Elementor: 4.x
-Stable tag: 2.4.2
+Stable tag: 2.5.0
 License: GPL-2.0-or-later
 
 Turns a WordPress site into its own remote MCP server, so Claude (web, Desktop,
@@ -126,6 +126,11 @@ wp_set_elementor also accepts "page_settings" for _elementor_page_settings, on
 its own or alongside elements.
 
 == Changelog ==
+
+= 2.5.0 =
+* Sign in with OAuth: add the server URL as a connector, click Connect and approve in wp-admin. No API key to copy. Administrators approve; the app acts as that administrator.
+* Requests with no credentials get a 401 challenge that starts OAuth. A wrong API key is still 403, and API keys keep working.
+* Discovery documents at /.well-known/oauth-authorization-server and /.well-known/oauth-protected-resource. Disable with the wpmcp_oauth_enabled option.
 
 = 2.4.2 =
 * Check for updates link on the Plugins screen looks up the latest GitHub release immediately.
