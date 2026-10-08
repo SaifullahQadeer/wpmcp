@@ -104,6 +104,10 @@ class WPMCP_Admin {
 			set_transient( 'wpmcp_notice_' . get_current_user_id(), array( 'text' => $message, 'type' => $type ), 60 );
 			wp_safe_redirect( add_query_arg( $extra, $this->tab_url( $tab ) ) );
 			exit;
+		} elseif ( 'dismiss_whatsnew' === $action ) {
+			update_user_meta( get_current_user_id(), 'wpmcp_seen_version', WPMCP_VERSION );
+			wp_safe_redirect( $this->tab_url( $tab ) );
+			exit;
 		} elseif ( 'clear_history' === $action ) {
 			WPMCP_History::clear();
 			$message = 'History cleared. Saved file snapshots are kept.';
@@ -159,13 +163,13 @@ class WPMCP_Admin {
 		$tools   = WPMCP_MCP::tools_spec();
 		foreach ( $tools as $tool ) { list( $on ) = $this->tool_status( $tool['name'] ); if ( $on ) { $active++; } }
 		$tiles = array(
-			array( 'Server', $enabled ? 'Running' : 'Paused', $enabled ? 'ok' : 'warn' ),
-			array( 'Connected apps', (string) count( $grants ), '' ),
-			array( 'Last activity', $last ? human_time_diff( $last ) . ' ago' : 'None yet', '' ),
-			array( 'Tools available', $active . ' of ' . count( $tools ), '' ),
+			array( 'system', 'Server', $enabled ? 'Running' : 'Paused', $enabled ? 'ok' : 'warn' ),
+			array( 'users', 'Connected apps', (string) count( $grants ), '' ),
+			array( 'activity', 'Last activity', $last ? human_time_diff( $last ) . ' ago' : 'None yet', '' ),
+			array( 'layers', 'Tools available', $active . ' of ' . count( $tools ), '' ),
 		);
 		echo '<div class="wpmcp-stats">';
-		foreach ( $tiles as $tile ) { echo '<div class="wpmcp-stat"><span>' . esc_html( $tile[0] ) . '</span><strong class="' . esc_attr( $tile[2] ) . '">' . esc_html( $tile[1] ) . '</strong></div>'; }
+		foreach ( $tiles as $tile ) { echo '<div class="wpmcp-stat"><span class="wpmcp-stat-icon">' . $this->icon( $tile[0], 18 ) . '</span><span class="wpmcp-stat-label">' . esc_html( $tile[1] ) . '</span><strong class="' . esc_attr( $tile[3] ) . '">' . esc_html( $tile[2] ) . '</strong></div>'; } // phpcs:ignore WordPress.Security.EscapeOutput -- icon() returns static markup.
 		echo '</div>';
 	}
 
@@ -188,7 +192,7 @@ class WPMCP_Admin {
 		);
 		$protocols = array( 'https', 'cursor', 'vscode' );
 		?>
-		<section class="wpmcp-panel"><div class="wpmcp-panel-head"><h2>Connect an AI app</h2><p>Pick your app and approve the connection on this site. There is no key to copy.</p></div>
+		<section class="wpmcp-panel" id="wpmcp-connect"><div class="wpmcp-panel-head"><h2><?php echo $this->icon( 'connect' ); ?>Connect an AI app</h2><p>Pick your app and approve the connection on this site. There is no key to copy.</p></div>
 		<div class="wpmcp-tools" role="group" aria-label="AI app">
 			<?php foreach ( $tools as $id => $label ) : ?><button type="button" class="wpmcp-tool" data-tool="<?php echo esc_attr( $id ); ?>" aria-pressed="<?php echo 'claude' === $id ? 'true' : 'false'; ?>"><?php echo esc_html( $label ); ?></button><?php endforeach; ?>
 		</div>
@@ -232,7 +236,7 @@ class WPMCP_Admin {
 	private function render_connected() {
 		$grants = WPMCP_OAuth::list_grants();
 		?>
-		<section class="wpmcp-panel"><div class="wpmcp-panel-head"><h2>Connected apps</h2><p>Apps that signed in through OAuth. Revoking cuts access immediately.</p></div>
+		<section class="wpmcp-panel"><div class="wpmcp-panel-head"><h2><?php echo $this->icon( 'users' ); ?>Connected apps</h2><p>Apps that signed in through OAuth. Revoking cuts access immediately.</p></div>
 		<?php if ( ! $grants ) : ?><p class="wpmcp-empty">No apps connected yet. After you approve a connection it appears here.</p><?php else : ?>
 		<table class="wpmcp-table"><thead><tr><th>App</th><th>Acts as</th><th>Connected</th><th>Last used</th><th></th></tr></thead><tbody>
 		<?php foreach ( $grants as $id => $g ) : $user = get_userdata( (int) $g['user_id'] ); ?>
@@ -269,7 +273,7 @@ class WPMCP_Admin {
 		$specs = array();
 		foreach ( WPMCP_MCP::tools_spec() as $spec ) { $specs[ $spec['name'] ] = $spec; }
 		?>
-		<section class="wpmcp-panel"><div class="wpmcp-panel-head"><h2>Tools your AI app can use</h2><p>Every tool this server offers. Plugin and theme tools stay off until you enable them in the Security tab.</p></div>
+		<section class="wpmcp-panel"><div class="wpmcp-panel-head"><h2><?php echo $this->icon( 'tools' ); ?>Tools your AI app can use</h2><p>Every tool this server offers. Plugin and theme tools stay off until you enable them in the Security tab.</p></div>
 		<?php foreach ( $groups as $group => $names ) : ?>
 			<h3 class="wpmcp-group"><?php echo esc_html( $group ); ?></h3>
 			<table class="wpmcp-table"><thead><tr><th>Tool</th><th>What it does</th><th>Access</th><th>Status</th></tr></thead><tbody>
@@ -303,7 +307,7 @@ class WPMCP_Admin {
 		$entries  = WPMCP_History::entries( $page, $per_page );
 		$force    = isset( $_GET['wpmcp_force'] ) ? absint( wp_unslash( $_GET['wpmcp_force'] ) ) : 0;
 		?>
-		<section class="wpmcp-panel"><div class="wpmcp-panel-head"><h2>Change history</h2><p>Every change an AI app makes through WP MCP is recorded here, with what it touched. Roll back restores only that part and leaves other edits alone. The latest <?php echo (int) WPMCP_History::KEEP_ROWS; ?> changes are kept for <?php echo (int) WPMCP_History::KEEP_DAYS; ?> days.</p></div>
+		<section class="wpmcp-panel"><div class="wpmcp-panel-head"><h2><?php echo $this->icon( 'history' ); ?>Change history</h2><p>Every change an AI app makes through WP MCP is recorded here, with what it touched. Roll back restores only that part and leaves other edits alone. The latest <?php echo (int) WPMCP_History::KEEP_ROWS; ?> changes are kept for <?php echo (int) WPMCP_History::KEEP_DAYS; ?> days.</p></div>
 		<?php if ( ! $entries ) : ?><p class="wpmcp-empty">No changes recorded yet. Changes made by connected apps will appear here.</p><?php else : ?>
 		<table class="wpmcp-table"><thead><tr><th>When</th><th>Who</th><th>Change</th><th>Status</th><th></th></tr></thead><tbody>
 		<?php foreach ( $entries as $row ) :
@@ -342,22 +346,22 @@ class WPMCP_Admin {
 	private function render_security( $key ) {
 		?>
 		<form method="post"><?php $this->form_fields( 'save', 'security' ); ?>
-		<section class="wpmcp-panel"><div class="wpmcp-panel-head"><h2>Access</h2><p>Changes apply to every connected app and API key.</p></div>
+		<section class="wpmcp-panel"><div class="wpmcp-panel-head"><h2><?php echo $this->icon( 'shield' ); ?>Access</h2><p>Changes apply to every connected app and API key.</p></div>
 		<?php $this->toggle( 'enabled', 'Enable MCP server', 'Allow authenticated apps to use this site’s tools. Turn off to pause everything.', '1' ); $this->toggle( 'oauth_enabled', 'Allow sign-in with OAuth', 'Lets AI apps connect with a Connect button and your approval, with no key to copy. Requires HTTPS.', '1' ); $this->toggle( 'allow_url_key', 'Allow API keys in URLs', 'For apps that cannot send headers. Headers keep keys out of server logs, so leave this off if you can.', '1' ); ?>
 		</section>
-		<section class="wpmcp-panel"><div class="wpmcp-panel-head"><h2>Plugins & themes</h2><p>Extension tools use the WordPress permissions of the administrator who saves these settings. They need HTTPS and a signed-in app or an API key header. Multisite is not supported.</p></div>
+		<section class="wpmcp-panel"><div class="wpmcp-panel-head"><h2><?php echo $this->icon( 'layers' ); ?>Plugins & themes</h2><p>Extension tools use the WordPress permissions of the administrator who saves these settings. They need HTTPS and a signed-in app or an API key header. Multisite is not supported.</p></div>
 		<?php $this->toggle( 'extensions_enabled', 'Allow extension access', 'List installed plugins and themes and read their editable files.' ); $this->toggle( 'allow_install', 'Allow installation', 'Install from WordPress.org. Installed extensions stay inactive.' ); $this->toggle( 'allow_edit', 'Allow code editing', 'Edit existing source files. Changes can break the site, so use a backup or staging site.' ); ?>
 		<div class="wpmcp-save"><button class="button button-primary button-hero">Save settings</button><span>Installation and editing also need extension access.</span></div></section>
 		</form>
 
-		<section class="wpmcp-panel"><div class="wpmcp-panel-head"><h2>API key</h2><p>For apps that cannot sign in with OAuth. Anyone with this key can use the enabled tools, so treat it like a password.</p></div>
+		<section class="wpmcp-panel"><div class="wpmcp-panel-head"><h2><?php echo $this->icon( 'key' ); ?>API key</h2><p>For apps that cannot sign in with OAuth. Anyone with this key can use the enabled tools, so treat it like a password.</p></div>
 		<div class="wpmcp-instruction"><strong>How to use it</strong><p>Send the key in the <code>x-api-key</code> header, or as <code>Authorization: Bearer YOUR_API_KEY</code>. If the app asks for an OAuth method, choose “No sign-in”.</p></div>
 		<?php $this->field( 'wpmcp-key', 'API key', $key, true ); ?>
 		<form method="post" class="wpmcp-rotate"><?php $this->form_fields( 'regenerate', 'security' ); ?><button class="button" data-confirm="Rotate the key? Apps using the old key stop working.">Rotate API key</button></form>
 		<details><summary>Key in URL (only if an app cannot send headers)</summary><p>Content tools only, and it needs “Allow API keys in URLs” above.</p><?php $this->field( 'wpmcp-url-key', 'URL containing your key', rest_url( WPMCP_NAMESPACE . '/mcp/' . $key ), true ); ?></details>
 		</section>
 
-		<section class="wpmcp-panel"><div class="wpmcp-panel-head"><h2>Built-in protection</h2></div>
+		<section class="wpmcp-panel"><div class="wpmcp-panel-head"><h2><?php echo $this->icon( 'shield' ); ?>Built-in protection</h2></div>
 		<ul class="wpmcp-list"><li>Ten wrong API keys from one address in 15 minutes block that address for 15 minutes.</li><li>OAuth sign-in needs an administrator’s approval, uses PKCE, and tokens act as that administrator. Revoking an app cuts access at once.</li><li>Source-file edits are checked before saving and keep up to ten snapshots per file.</li><li>Browser requests from other sites are rejected.</li></ul>
 		</section>
 		<?php
@@ -374,7 +378,7 @@ class WPMCP_Admin {
 		$check    = wp_nonce_url( admin_url( 'admin.php?page=wp-mcp&wpmcp_check_update=1&wpmcp_return=1' ), 'wpmcp_check_update' );
 		$meta     = WPMCP_OAuth::server_metadata();
 		?>
-		<section class="wpmcp-panel"><div class="wpmcp-panel-head"><h2>Plugin</h2></div>
+		<section class="wpmcp-panel"><div class="wpmcp-panel-head"><h2><?php echo $this->icon( 'bolt' ); ?>Plugin</h2></div>
 		<table class="wpmcp-kv"><tbody>
 		<?php
 		$this->row( 'Version', esc_html( WPMCP_VERSION ) . ( $new ? ' ' . $this->badge( 'Update available: ' . $new, 'warn' ) : ' ' . $this->badge( 'Up to date', 'ok' ) ) . ( current_user_can( 'update_plugins' ) ? ' <a class="button button-small" href="' . esc_url( $check ) . '">Check for updates</a>' : '' ) );
@@ -383,7 +387,7 @@ class WPMCP_Admin {
 		?>
 		</tbody></table></section>
 
-		<section class="wpmcp-panel"><div class="wpmcp-panel-head"><h2>This site</h2></div>
+		<section class="wpmcp-panel"><div class="wpmcp-panel-head"><h2><?php echo $this->icon( 'system' ); ?>This site</h2></div>
 		<table class="wpmcp-kv"><tbody>
 		<?php
 		$this->row( 'WordPress', esc_html( get_bloginfo( 'version' ) ) . ( is_multisite() ? ' ' . $this->badge( 'Multisite', 'warn' ) : '' ) );
@@ -394,7 +398,7 @@ class WPMCP_Admin {
 		?>
 		</tbody></table></section>
 
-		<section class="wpmcp-panel"><div class="wpmcp-panel-head"><h2>Endpoints</h2><p>For developers and troubleshooting.</p></div>
+		<section class="wpmcp-panel"><div class="wpmcp-panel-head"><h2><?php echo $this->icon( 'code' ); ?>Endpoints</h2><p>For developers and troubleshooting.</p></div>
 		<table class="wpmcp-kv"><tbody>
 		<?php
 		$this->row( 'MCP server', '<code>' . esc_html( $url ) . '</code>' );
@@ -407,7 +411,7 @@ class WPMCP_Admin {
 		?>
 		</tbody></table></section>
 
-		<section class="wpmcp-panel"><div class="wpmcp-panel-head"><h2>File safety & recovery</h2></div>
+		<section class="wpmcp-panel"><div class="wpmcp-panel-head"><h2><?php echo $this->icon( 'shield' ); ?>File safety & recovery</h2></div>
 		<p>Every source-file edit is checked before saving and keeps a pre-edit snapshot in the database. WP MCP retains the latest ten snapshots per file. PHP checks catch syntax errors, missing tags and unexpected text outside PHP; JSON is validated too. These checks do not guarantee correct runtime behavior.</p>
 		<p>Ask your assistant to validate with <code>dry_run: true</code>, apply one change, then check <code>wp_ping</code> and the affected page. To undo an edit, use <code>wp_list_file_backups</code> and <code>wp_restore_extension_file</code> with the current file hash.</p>
 		<details><summary>If the site or connector stops responding</summary><ol>
@@ -424,6 +428,139 @@ class WPMCP_Admin {
 	/* Page shell                                                        */
 	/* ----------------------------------------------------------------- */
 
+	/* ----------------------------------------------------------------- */
+	/* Icons, changelog, banners and sidebar                             */
+	/* ----------------------------------------------------------------- */
+
+	/** Inline SVG icon (stroke style, inherits the text colour). */
+	private function icon( $name, $size = 20 ) {
+		static $paths = null;
+		if ( null === $paths ) {
+			$paths = array(
+				'bolt'     => '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',
+				'connect'  => '<path d="M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0z"/><path d="M12 18v4"/>',
+				'tools'    => '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/>',
+				'history'  => '<path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 7v5l3 2"/>',
+				'shield'   => '<path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/>',
+				'system'   => '<rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/><path d="M7 7h.01M7 17h.01"/>',
+				'check'    => '<circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/>',
+				'alert'    => '<path d="M12 3 2 21h20z"/><path d="M12 10v5M12 18h.01"/>',
+				'arrow'    => '<path d="M5 12h14M13 6l6 6-6 6"/>',
+				'external' => '<path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
+				'sparkles' => '<path d="m12 3 2 5 5 2-5 2-2 5-2-5-5-2 5-2z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>',
+				'book'     => '<path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 19V5"/>',
+				'issue'    => '<circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/>',
+				'code'     => '<path d="m8 8-5 4 5 4M16 8l5 4-5 4"/>',
+				'key'      => '<circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M16 7l3 3M14 9l2 2"/>',
+				'users'    => '<circle cx="9" cy="8" r="3.5"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 3 6"/>',
+				'activity' => '<path d="M3 12h4l3-8 4 16 3-8h4"/>',
+				'layers'   => '<path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/>',
+			);
+		}
+		if ( ! isset( $paths[ $name ] ) ) { return ''; }
+		return '<svg class="wpmcp-icon" width="' . (int) $size . '" height="' . (int) $size . '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' . $paths[ $name ] . '</svg>';
+	}
+
+	/**
+	 * Recent releases, read from the Changelog section of readme.txt so the screen
+	 * never drifts from what was shipped.
+	 *
+	 * @return array<int,array{version:string,items:string[]}>
+	 */
+	private function changelog( $limit = 3 ) {
+		$file = WPMCP_PLUGIN_DIR . 'readme.txt';
+		$text = is_readable( $file ) ? (string) file_get_contents( $file ) : '';
+		$pos  = strpos( $text, '== Changelog ==' );
+		if ( false === $pos ) { return array(); }
+		$entries = array();
+		$current = null;
+		foreach ( preg_split( '/\R/', substr( $text, $pos ) ) as $line ) {
+			if ( preg_match( '/^= (\S+) =\s*$/', $line, $m ) ) {
+				if ( null !== $current && count( $entries ) >= $limit ) { break; }
+				$entries[] = array( 'version' => $m[1], 'items' => array() );
+				$current   = count( $entries ) - 1;
+			} elseif ( null !== $current && preg_match( '/^\* (.+)$/', $line, $m ) ) {
+				$entries[ $current ]['items'][] = trim( $m[1] );
+			} elseif ( null !== $current && preg_match( '/^\s+(\S.*)$/', $line, $m ) && $entries[ $current ]['items'] ) {
+				$entries[ $current ]['items'][ count( $entries[ $current ]['items'] ) - 1 ] .= ' ' . trim( $m[1] );
+			}
+		}
+		return array_slice( $entries, 0, $limit );
+	}
+
+	private function shorten( $text, $max = 120 ) {
+		return mb_strlen( $text ) > $max ? rtrim( mb_substr( $text, 0, $max - 1 ) ) . '…' : $text;
+	}
+
+	/** Big headline at the top of the Connect tab. */
+	private function render_hero() {
+		?>
+		<section class="wpmcp-hero">
+		<span class="wpmcp-eyebrow"><?php echo $this->icon( 'bolt', 14 ); // phpcs:ignore WordPress.Security.EscapeOutput -- static markup. ?> Remote MCP server for WordPress</span>
+		<h2>WordPress work. Done through <em>conversation.</em></h2>
+		<p>Connect your AI to WordPress. Create content, manage media, and update Elementor layouts from one conversation.</p>
+		<div class="wpmcp-hero-actions">
+			<a class="button button-primary" href="#wpmcp-connect">Get started</a>
+			<a class="button wpmcp-outline" href="<?php echo esc_url( $this->tab_url( 'tools' ) ); ?>">Explore the workflow <?php echo $this->icon( 'arrow', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput ?></a>
+		</div>
+		</section>
+		<?php
+	}
+
+	/** One-time "what's new" banner after an update, until the administrator dismisses it. */
+	private function render_whatsnew() {
+		if ( get_user_meta( get_current_user_id(), 'wpmcp_seen_version', true ) === WPMCP_VERSION ) { return; }
+		$log = $this->changelog( 1 );
+		if ( ! $log || ! $log[0]['items'] ) { return; }
+		?>
+		<section class="wpmcp-banner" aria-label="What's new">
+			<span class="wpmcp-banner-icon"><?php echo $this->icon( 'sparkles', 22 ); // phpcs:ignore WordPress.Security.EscapeOutput ?></span>
+			<div class="wpmcp-banner-body"><strong>WP MCP <?php echo esc_html( WPMCP_VERSION ); ?> is installed</strong>
+			<ul><?php foreach ( array_slice( $log[0]['items'], 0, 3 ) as $item ) : ?><li><?php echo esc_html( $this->shorten( $item, 150 ) ); ?></li><?php endforeach; ?></ul></div>
+			<form method="post" class="wpmcp-banner-actions"><?php $this->form_fields( 'dismiss_whatsnew', 'connect' ); ?><button class="button button-primary">Got it</button><a class="button wpmcp-outline" href="https://github.com/SaifullahQadeer/wpmcp/releases" target="_blank" rel="noopener">All changes</a></form>
+		</section>
+		<?php
+	}
+
+	/** Right-hand column shown on every tab: update notice, changelog, health checklist, links. */
+	private function render_sidebar( $enabled ) {
+		$new    = ( new WPMCP_Updater() )->cached_update();
+		$log    = $this->changelog( 2 );
+		$https  = 'https' === wp_parse_url( home_url(), PHP_URL_SCHEME );
+		$env    = WPMCP_Elementor::environment();
+		$checks = array(
+			array( $enabled, 'MCP server', $enabled ? 'Running' : 'Paused' ),
+			array( $https, 'HTTPS', $https ? 'On' : 'Needed for sign-in' ),
+			array( (bool) get_option( 'permalink_structure' ), 'Pretty permalinks', get_option( 'permalink_structure' ) ? 'On' : 'Needed for the REST API' ),
+			array( WPMCP_OAuth::enabled(), 'OAuth sign-in', WPMCP_OAuth::enabled() ? 'On' : 'Off' ),
+			array( ! empty( $env['active'] ), 'Elementor', ! empty( $env['active'] ) ? $env['version'] : 'Not detected' ),
+		);
+		if ( $new ) : ?>
+			<section class="wpmcp-side-card wpmcp-side-update"><span class="wpmcp-badge wpmcp-badge-coral">Update available</span>
+			<h3>Version <?php echo esc_html( $new ); ?> is ready</h3><p>You have <?php echo esc_html( WPMCP_VERSION ); ?>. Updating takes a few seconds.</p>
+			<a class="button button-primary" href="<?php echo esc_url( admin_url( 'plugins.php?plugin_status=upgrade' ) ); ?>">Update now</a></section>
+		<?php endif; ?>
+		<section class="wpmcp-side-card"><h3><?php echo $this->icon( 'sparkles', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput ?> What’s new</h3>
+		<?php foreach ( $log as $entry ) : ?>
+			<div class="wpmcp-log"><span class="wpmcp-badge wpmcp-badge-neutral">v<?php echo esc_html( $entry['version'] ); ?></span>
+			<ul><?php foreach ( array_slice( $entry['items'], 0, 3 ) as $item ) : ?><li><?php echo esc_html( $this->shorten( $item ) ); ?></li><?php endforeach; ?></ul></div>
+		<?php endforeach; ?>
+		<a class="wpmcp-link" href="https://github.com/SaifullahQadeer/wpmcp/releases" target="_blank" rel="noopener">All releases <?php echo $this->icon( 'external', 14 ); // phpcs:ignore WordPress.Security.EscapeOutput ?></a></section>
+
+		<section class="wpmcp-side-card"><h3><?php echo $this->icon( 'activity', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput ?> Health</h3>
+		<ul class="wpmcp-health"><?php foreach ( $checks as $check ) : ?>
+			<li class="<?php echo $check[0] ? 'is-ok' : 'is-warn'; ?>"><?php echo $this->icon( $check[0] ? 'check' : 'alert', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput ?><span><strong><?php echo esc_html( $check[1] ); ?></strong><small><?php echo esc_html( $check[2] ); ?></small></span></li>
+		<?php endforeach; ?></ul></section>
+
+		<section class="wpmcp-side-card"><h3><?php echo $this->icon( 'book', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput ?> Resources</h3>
+		<ul class="wpmcp-links">
+			<li><a href="https://github.com/SaifullahQadeer/wpmcp#readme" target="_blank" rel="noopener"><?php echo $this->icon( 'book', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput ?> Documentation</a></li>
+			<li><a href="https://github.com/SaifullahQadeer/wpmcp/issues" target="_blank" rel="noopener"><?php echo $this->icon( 'issue', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput ?> Report an issue</a></li>
+			<li><a href="https://github.com/SaifullahQadeer/wpmcp/releases" target="_blank" rel="noopener"><?php echo $this->icon( 'code', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput ?> Release notes</a></li>
+		</ul></section>
+		<?php
+	}
+
 	public function render_page() {
 		if ( ! current_user_can( 'manage_options' ) ) { return; }
 		$key     = (string) get_option( 'wpmcp_api_key', '' );
@@ -433,22 +570,26 @@ class WPMCP_Admin {
 		$new     = ( new WPMCP_Updater() )->cached_update();
 		$notice  = get_transient( 'wpmcp_notice_' . get_current_user_id() );
 		delete_transient( 'wpmcp_notice_' . get_current_user_id() );
+		$icons   = array( 'connect' => 'connect', 'tools' => 'tools', 'history' => 'history', 'security' => 'shield', 'system' => 'system' );
 		?>
 		<div class="wrap wpmcp">
-		<header class="wpmcp-header"><div><h1>WP MCP <span>v<?php echo esc_html( WPMCP_VERSION ); ?></span></h1><p>Let AI apps manage your WordPress site, with you in control.</p></div>
+		<header class="wpmcp-header"><div class="wpmcp-brand"><span class="wpmcp-mark"><?php echo $this->icon( 'bolt', 22 ); // phpcs:ignore WordPress.Security.EscapeOutput ?></span><div><h1>WP MCP <span>v<?php echo esc_html( WPMCP_VERSION ); ?></span></h1><p>Let AI apps manage your WordPress site, with you in control.</p></div></div>
 		<div class="wpmcp-header-side"><?php if ( $new ) : ?><a class="wpmcp-pill wpmcp-pill-warn" href="<?php echo esc_url( $this->tab_url( 'system' ) ); ?>">Update available: <?php echo esc_html( $new ); ?></a><?php endif; ?><span class="wpmcp-pill <?php echo $enabled ? 'wpmcp-pill-ok' : 'wpmcp-pill-warn'; ?>"><?php echo $enabled ? 'Server running' : 'Server paused'; ?></span></div></header>
-		<nav class="wpmcp-tabs" aria-label="WP MCP sections"><?php foreach ( $this->tabs() as $id => $label ) : ?><a href="<?php echo esc_url( $this->tab_url( $id ) ); ?>"<?php echo $id === $tab ? ' class="is-active" aria-current="page"' : ''; ?>><?php echo esc_html( $label ); ?></a><?php endforeach; ?></nav>
+		<nav class="wpmcp-tabs" aria-label="WP MCP sections"><?php foreach ( $this->tabs() as $id => $label ) : ?><a href="<?php echo esc_url( $this->tab_url( $id ) ); ?>"<?php echo $id === $tab ? ' class="is-active" aria-current="page"' : ''; ?>><?php echo $this->icon( $icons[ $id ], 17 ); // phpcs:ignore WordPress.Security.EscapeOutput ?><?php echo esc_html( $label ); ?></a><?php endforeach; ?></nav>
 		<?php if ( is_array( $notice ) ) : ?><div class="notice notice-<?php echo esc_attr( $notice['type'] ); ?>"><p><?php echo esc_html( $notice['text'] ); ?></p></div><?php endif; ?>
 		<?php if ( isset( $_GET['wpmcp_connected'] ) ) : ?><div class="notice notice-success is-dismissible"><p><strong>Claude is connected.</strong> Ask Claude to run <code>wp_ping</code> to try it.</p></div><?php endif; ?>
 		<?php if ( ! is_ssl() ) : ?><div class="notice notice-warning"><p>Configure HTTPS before connecting. OAuth sign-in and extension tools need a secure request.</p></div><?php endif; ?>
 		<?php if ( ! get_option( 'permalink_structure' ) ) : ?><div class="notice notice-warning"><p>Enable pretty permalinks: the REST API address does not work with Plain permalinks.</p></div><?php endif; ?>
+		<?php if ( 'connect' === $tab ) { $this->render_whatsnew(); } ?>
+		<div class="wpmcp-grid"><main class="wpmcp-main">
 		<?php
 		if ( 'tools' === $tab ) { $this->render_tools(); }
 		elseif ( 'history' === $tab ) { $this->render_history(); }
 		elseif ( 'security' === $tab ) { $this->render_security( $key ); }
 		elseif ( 'system' === $tab ) { $this->render_system( $url ); }
-		else { $this->render_stats( $enabled ); $this->render_connect( $url ); $this->render_connected(); }
+		else { $this->render_hero(); $this->render_stats( $enabled ); $this->render_connect( $url ); $this->render_connected(); }
 		?>
+		</main><aside class="wpmcp-side" aria-label="Updates and help"><?php $this->render_sidebar( $enabled ); ?></aside></div>
 		<footer class="wpmcp-footer">WP MCP · By Saifullah Qadeer</footer><p id="wpmcp-feedback" class="screen-reader-text" role="status" aria-live="polite"></p></div>
 		<?php
 	}

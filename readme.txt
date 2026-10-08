@@ -3,7 +3,7 @@ Author: Saifullah Qadeer
 Requires at least: 5.6
 Requires PHP: 7.4
 Tested with Elementor: 4.x
-Stable tag: 2.8.0
+Stable tag: 2.9.0
 License: GPL-2.0-or-later
 
 Turns a WordPress site into its own remote MCP server, so Claude (web, Desktop,
@@ -138,6 +138,11 @@ wp_set_elementor also accepts "page_settings" for _elementor_page_settings, on
 its own or alongside elements.
 
 == Changelog ==
+
+= 2.9.0 =
+* New look for the admin screen: warm off-white with coral and outlined buttons, a headline banner on the Connect tab, and icons throughout.
+* A sidebar on every tab with update notice, What's new (read from this changelog), a health checklist and links to documentation and issues.
+* After each update a What's new banner shows the latest changes, with a Got it button to dismiss it.
 
 = 2.8.0 =
 * History tab and rollback: every change made through WP MCP is recorded and can be undone from the admin screen, or by an app with wp_list_history and wp_rollback.
