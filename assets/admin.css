@@ -193,3 +193,25 @@ body.toplevel_page_wp-mcp #wpbody-content .notice:not(.wpmcp-notice),body.toplev
 .wpmcp-tool-meta{display:flex;align-items:center;gap:10px;flex:none}
 .wpmcp-toollist .is-off .wpmcp-tool-main strong{color:var(--muted)}
 .wpmcp-toollist .wpmcp-why{margin:0}
+
+/* WordPress adds a blue ring on focus; mouse focus shows nothing, keyboard focus a coral outline */
+.wp-core-ui .wpmcp .button:focus,.wp-core-ui .wpmcp .button:active,.wp-core-ui .wpmcp .button-primary:focus,.wp-core-ui .wpmcp .button-primary:active,.wpmcp a:focus,.wpmcp button:focus,.wpmcp input:focus,.wpmcp select:focus,.wpmcp summary:focus{box-shadow:none!important;outline:0!important}
+.wp-core-ui .wpmcp .button:focus-visible,.wpmcp a:focus-visible,.wpmcp button:focus-visible,.wpmcp summary:focus-visible{outline:2px solid var(--accent)!important;outline-offset:2px}
+.wp-core-ui .wpmcp .button:focus{border-color:var(--ink)}
+.wp-core-ui .wpmcp .button-primary:focus,.wp-core-ui .wpmcp .button-primary:active{border-color:var(--accent-dark)}
+.wpmcp input[type=text]:focus,.wpmcp input[type=password]:focus{border-color:var(--ink)}
+
+/* Health */
+.wpmcp-health.is-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 32px}
+.wpmcp-health .is-info .wpmcp-icon{color:#9aa0a6}
+.wpmcp-panel-head h2 .wpmcp-badge{margin-left:4px}
+
+/* Works with */
+.wpmcp-compat-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.wpmcp-compat{display:flex;gap:12px;align-items:flex-start;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:var(--bg)}
+.wpmcp-compat>div{flex:1;min-width:0}
+.wpmcp-compat strong{display:block;font-size:13px;font-weight:600}
+.wpmcp-compat small{display:block;color:var(--muted);font-size:12px;line-height:1.5;margin-top:3px}
+.wpmcp-compat-icon{display:grid;place-items:center;flex:none;width:34px;height:34px;border-radius:9px;background:var(--card);border:1px solid var(--line)}
+.wpmcp-compat .wpmcp-badge{flex:none;max-width:42%;overflow:hidden;text-overflow:ellipsis}
+@media(max-width:900px){.wpmcp-health.is-grid,.wpmcp-compat-grid{grid-template-columns:minmax(0,1fr)}}

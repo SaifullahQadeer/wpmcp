@@ -392,10 +392,10 @@ class WPMCP_Admin {
 
 	private function render_system( $url ) {
 		$env      = WPMCP_Elementor::environment();
-		$https    = 'https' === wp_parse_url( home_url(), PHP_URL_SCHEME );
 		$new      = ( new WPMCP_Updater() )->cached_update();
 		$check    = wp_nonce_url( admin_url( 'admin.php?page=wp-mcp&wpmcp_check_update=1&wpmcp_return=1' ), 'wpmcp_check_update' );
 		$meta     = WPMCP_OAuth::server_metadata();
+		$this->render_health();
 		?>
 		<section class="wpmcp-panel"><div class="wpmcp-panel-head"><h2><?php echo $this->icon( 'bolt' ); ?>Plugin</h2></div>
 		<table class="wpmcp-kv"><tbody>
@@ -412,8 +412,6 @@ class WPMCP_Admin {
 		$this->row( 'WordPress', esc_html( get_bloginfo( 'version' ) ) . ( is_multisite() ? ' ' . $this->badge( 'Multisite', 'warn' ) : '' ) );
 		$this->row( 'PHP', esc_html( PHP_VERSION ) );
 		$this->row( 'Elementor', $env['active'] ? esc_html( $env['version'] . ' · ' . $env['generation'] ) : 'Not detected' );
-		$this->row( 'HTTPS', $https ? $this->badge( 'On', 'ok' ) : $this->badge( 'Off: OAuth and extension tools need HTTPS', 'warn' ) );
-		$this->row( 'Pretty permalinks', get_option( 'permalink_structure' ) ? $this->badge( 'On', 'ok' ) : $this->badge( 'Off: the REST API address needs them', 'warn' ) );
 		?>
 		</tbody></table></section>
 
@@ -446,6 +444,67 @@ class WPMCP_Admin {
 	/* ----------------------------------------------------------------- */
 	/* Page shell                                                        */
 	/* ----------------------------------------------------------------- */
+
+	/** Setup checks. State is ok, warn (needs attention) or info (optional, not installed). */
+	private function health_checks() {
+		$enabled = '1' === (string) get_option( 'wpmcp_enabled', '1' );
+		$https   = 'https' === wp_parse_url( home_url(), PHP_URL_SCHEME );
+		$pretty  = (bool) get_option( 'permalink_structure' );
+		$el      = WPMCP_Elementor::environment();
+		$divi    = WPMCP_Builders::divi_info();
+		$caches  = WPMCP_Site::detected_caches();
+		return array(
+			array( $enabled ? 'ok' : 'warn', 'MCP server', $enabled ? 'Running' : 'Paused. Turn it on in Security.' ),
+			array( $https ? 'ok' : 'warn', 'HTTPS', $https ? 'On' : 'Off. Sign-in and extension tools need it.' ),
+			array( $pretty ? 'ok' : 'warn', 'Pretty permalinks', $pretty ? 'On' : 'Off. The REST API address needs them.' ),
+			array( WPMCP_OAuth::enabled() ? 'ok' : 'warn', 'OAuth sign-in', WPMCP_OAuth::enabled() ? 'On' : 'Off. Apps need an API key instead.' ),
+			array( version_compare( PHP_VERSION, '7.4', '>=' ) ? 'ok' : 'warn', 'PHP', PHP_VERSION ),
+			array( 'ok', 'Block editor', 'Active' ),
+			array( ! empty( $el['active'] ) ? 'ok' : 'info', 'Elementor', ! empty( $el['active'] ) ? $el['version'] . ' · ' . $el['generation'] : 'Not installed' ),
+			array( ! empty( $divi['active'] ) ? 'ok' : 'info', 'Divi', ! empty( $divi['active'] ) ? $divi['version'] . ' · ' . $divi['generation'] : 'Not installed' ),
+			array( $caches ? 'ok' : 'info', 'Page cache', $caches ? implode( ', ', $caches ) : 'None detected' ),
+		);
+	}
+
+	private function render_health() {
+		$checks = $this->health_checks();
+		$warn   = count( array_filter( $checks, function ( $c ) { return 'warn' === $c[0]; } ) );
+		$icons  = array( 'ok' => 'check', 'warn' => 'alert', 'info' => 'issue' );
+		?>
+		<section class="wpmcp-panel"><div class="wpmcp-panel-head"><h2><?php echo $this->icon( 'activity' ); // phpcs:ignore WordPress.Security.EscapeOutput ?>Health <?php echo $warn ? $this->badge( $warn . ' to fix', 'warn' ) : $this->badge( 'All good', 'ok' ); // phpcs:ignore WordPress.Security.EscapeOutput ?></h2></div>
+		<ul class="wpmcp-health is-grid"><?php foreach ( $checks as $check ) : ?>
+			<li class="is-<?php echo esc_attr( $check[0] ); ?>"><?php echo $this->icon( $icons[ $check[0] ], 18 ); // phpcs:ignore WordPress.Security.EscapeOutput ?><span><strong><?php echo esc_html( $check[1] ); ?></strong><small><?php echo esc_html( $check[2] ); ?></small></span></li>
+		<?php endforeach; ?></ul></section>
+		<?php
+	}
+
+	/** What WP MCP works with, and which of it is installed on this site. */
+	private function render_compat() {
+		$el      = WPMCP_Elementor::environment();
+		$ed      = WPMCP_Builders::environment();
+		$divi    = $ed['divi'];
+		$caches  = WPMCP_Site::detected_caches();
+		$el_on   = ! empty( $el['active'] );
+		$el_v4   = $el_on && 'v4-atomic' === $el['generation'];
+		$divi_on = ! empty( $divi['active'] );
+		$tiles   = array(
+			array( 'layers', 'Block editor (Gutenberg)', 'Block pages, patterns and templates, with markup checked before it is saved.', true, ! empty( $ed['gutenberg']['block_theme'] ) ? 'Block theme' : 'Active' ),
+			array( 'tools', 'Elementor 3 (classic)', 'Containers, sections and widgets, plus page settings.', $el_on && ! $el_v4, $el_on && ! $el_v4 ? $el['version'] : '' ),
+			array( 'sparkles', 'Elementor 4 (atomic)', 'Atomic editor layouts in the v4 data shape.', $el_v4, $el_v4 ? $el['version'] : '' ),
+			array( 'code', 'Divi 4 (shortcodes)', 'Sections, rows and modules, read and written section by section.', $divi_on && 'v4-shortcodes' === $divi['generation'], $divi_on && 'v4-shortcodes' === $divi['generation'] ? $divi['version'] : '' ),
+			array( 'code', 'Divi 5 (blocks)', 'Block-based layouts through the block editor tools.', $divi_on && 'v5-blocks' === $divi['generation'], $divi_on && 'v5-blocks' === $divi['generation'] ? $divi['version'] : '' ),
+			array( 'book', 'Posts, pages and custom types', 'Content, media, terms and custom fields, with history and rollback.', true, 'Active' ),
+			array( 'system', 'Caches', 'Object cache, Elementor and Divi CSS, and page cache plugins such as LiteSpeed, WP Rocket and W3 Total Cache.', (bool) $caches, $caches ? implode( ', ', $caches ) : '' ),
+			array( 'key', 'Site settings and plugins', 'Title, permalinks, homepage, and plugin and theme activation (opt-in).', true, 'Active' ),
+		);
+		?>
+		<section class="wpmcp-panel"><div class="wpmcp-panel-head"><h2><?php echo $this->icon( 'check' ); // phpcs:ignore WordPress.Security.EscapeOutput ?>Works with</h2><p>Page builders and tools your AI app can work with. Green means it is active on this site; Ready means it is supported once you install it.</p></div>
+		<div class="wpmcp-compat-grid"><?php foreach ( $tiles as $tile ) : ?>
+			<div class="wpmcp-compat"><span class="wpmcp-compat-icon"><?php echo $this->icon( $tile[0], 18 ); // phpcs:ignore WordPress.Security.EscapeOutput ?></span><div><strong><?php echo esc_html( $tile[1] ); ?></strong><small><?php echo esc_html( $tile[2] ); ?></small></div>
+			<?php echo $tile[3] ? $this->badge( '' !== $tile[4] ? $tile[4] : 'Installed', 'ok' ) : $this->badge( 'Ready', 'neutral' ); // phpcs:ignore WordPress.Security.EscapeOutput ?></div>
+		<?php endforeach; ?></div></section>
+		<?php
+	}
 
 	/* ----------------------------------------------------------------- */
 	/* Icons, changelog, banners and sidebar                             */
@@ -530,19 +589,10 @@ class WPMCP_Admin {
 		<?php
 	}
 
-	/** Right-hand column shown on every tab: update notice, changelog, health checklist, links. */
+	/** Right-hand column shown on every tab: update notice, changelog, links. */
 	private function render_sidebar( $enabled ) {
 		$new    = ( new WPMCP_Updater() )->cached_update();
 		$log    = $this->changelog( 2 );
-		$https  = 'https' === wp_parse_url( home_url(), PHP_URL_SCHEME );
-		$env    = WPMCP_Elementor::environment();
-		$checks = array(
-			array( $enabled, 'MCP server', $enabled ? 'Running' : 'Paused' ),
-			array( $https, 'HTTPS', $https ? 'On' : 'Needed for sign-in' ),
-			array( (bool) get_option( 'permalink_structure' ), 'Pretty permalinks', get_option( 'permalink_structure' ) ? 'On' : 'Needed for the REST API' ),
-			array( WPMCP_OAuth::enabled(), 'OAuth sign-in', WPMCP_OAuth::enabled() ? 'On' : 'Off' ),
-			array( ! empty( $env['active'] ), 'Elementor', ! empty( $env['active'] ) ? $env['version'] : 'Not detected' ),
-		);
 		if ( $new ) : ?>
 			<section class="wpmcp-side-card wpmcp-side-update"><span class="wpmcp-badge wpmcp-badge-coral">Update available</span>
 			<h3>Version <?php echo esc_html( $new ); ?> is ready</h3><p>You have <?php echo esc_html( WPMCP_VERSION ); ?>. Updating takes a few seconds.</p>
@@ -554,11 +604,6 @@ class WPMCP_Admin {
 			<ul><?php foreach ( array_slice( $entry['items'], 0, 3 ) as $item ) : ?><li><?php echo esc_html( $this->shorten( $item ) ); ?></li><?php endforeach; ?></ul></div>
 		<?php endforeach; ?>
 		<a class="wpmcp-link" href="https://github.com/SaifullahQadeer/wpmcp/releases" target="_blank" rel="noopener">All releases <?php echo $this->icon( 'external', 14 ); // phpcs:ignore WordPress.Security.EscapeOutput ?></a></section>
-
-		<section class="wpmcp-side-card"><h3><?php echo $this->icon( 'activity', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput ?> Health</h3>
-		<ul class="wpmcp-health"><?php foreach ( $checks as $check ) : ?>
-			<li class="<?php echo $check[0] ? 'is-ok' : 'is-warn'; ?>"><?php echo $this->icon( $check[0] ? 'check' : 'alert', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput ?><span><strong><?php echo esc_html( $check[1] ); ?></strong><small><?php echo esc_html( $check[2] ); ?></small></span></li>
-		<?php endforeach; ?></ul></section>
 
 		<section class="wpmcp-side-card"><h3><?php echo $this->icon( 'book', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput ?> Resources</h3>
 		<ul class="wpmcp-links">
@@ -596,7 +641,7 @@ class WPMCP_Admin {
 		elseif ( 'history' === $tab ) { $this->render_history(); }
 		elseif ( 'security' === $tab ) { $this->render_security( $key ); }
 		elseif ( 'system' === $tab ) { $this->render_system( $url ); }
-		else { $this->render_stats( $enabled ); $this->render_connect( $url ); $this->render_connected(); }
+		else { $this->render_stats( $enabled ); $this->render_connect( $url ); $this->render_connected(); $this->render_compat(); }
 		?>
 		</main><aside class="wpmcp-side" aria-label="Updates and help"><?php $this->render_sidebar( $enabled ); ?></aside></div>
 		<p id="wpmcp-feedback" class="screen-reader-text" role="status" aria-live="polite"></p></div>

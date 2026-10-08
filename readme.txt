@@ -3,7 +3,7 @@ Author: Saifullah Qadeer
 Requires at least: 5.6
 Requires PHP: 7.4
 Tested with Elementor: 4.x
-Stable tag: 2.10.1
+Stable tag: 2.10.2
 License: GPL-2.0-or-later
 
 Turns a WordPress site into its own remote MCP server, so Claude (web, Desktop,
@@ -177,6 +177,11 @@ The admin screen bundles the Inter typeface (SIL Open Font License 1.1, see
 assets/fonts/Inter-LICENSE.txt). Nothing is loaded from external servers.
 
 == Changelog ==
+
+= 2.10.2 =
+* New Works with section on the Connect tab: Gutenberg, Elementor 3 and 4, Divi 4 and 5, content, caches and settings, with what is active on this site.
+* Health checks moved to the System tab, with optional items (Elementor, Divi, page cache) shown as information instead of warnings.
+* The blue focus ring that WordPress adds to buttons and links no longer appears after a click; keyboard focus still shows a coral outline.
 
 = 2.10.1 =
 * Cleaner admin screen: notices from other plugins no longer appear on it, the server status pill and footer credit are gone, and the focus outline on tabs no longer shows a blue box.
