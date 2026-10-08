@@ -3,7 +3,7 @@ Author: Saifullah Qadeer
 Requires at least: 5.6
 Requires PHP: 7.4
 Tested with Elementor: 4.x
-Stable tag: 2.4.1
+Stable tag: 2.4.2
 License: GPL-2.0-or-later
 
 Turns a WordPress site into its own remote MCP server, so Claude (web, Desktop,
@@ -127,7 +127,7 @@ its own or alongside elements.
 
 == Changelog ==
 
-= Unreleased =
+= 2.4.2 =
 * Check for updates link on the Plugins screen looks up the latest GitHub release immediately.
 
 = 2.4.1 =
