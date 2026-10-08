@@ -3,7 +3,7 @@ Author: Saifullah Qadeer
 Requires at least: 5.6
 Requires PHP: 7.4
 Tested with Elementor: 4.x
-Stable tag: 2.11.1
+Stable tag: 2.11.2
 License: GPL-2.0-or-later
 
 Turns a WordPress site into its own remote MCP server, so Claude (web, Desktop,
@@ -192,6 +192,9 @@ The admin screen bundles the Inter typeface (SIL Open Font License 1.1, see
 assets/fonts/Inter-LICENSE.txt). Nothing is loaded from external servers.
 
 == Changelog ==
+
+= 2.11.2 =
+* The note beside Save settings now says activation, as well as installation and editing, needs extension access.
 
 = 2.11.1 =
 * Fixed: in the Security tab the API key field and the key-in-URL showed "full" instead of the key (the access level picker reused the same variable). The stored key was never changed; it is shown correctly again. If you copied the key from 2.11.0, copy it again.

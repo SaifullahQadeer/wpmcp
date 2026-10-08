@@ -379,7 +379,7 @@ class WPMCP_Admin {
 		</section>
 		<section class="wpmcp-panel"><div class="wpmcp-panel-head"><h2><?php echo $this->icon( 'layers' ); ?>Plugins & themes</h2><p>Extension tools use the WordPress permissions of the administrator who saves these settings. They need HTTPS and a signed-in app or an API key header. Multisite is not supported.</p></div>
 		<?php $this->toggle( 'extensions_enabled', 'Allow extension access', 'List installed plugins and themes and read their editable files.' ); $this->toggle( 'allow_install', 'Allow installation', 'Install from WordPress.org. Installed extensions stay inactive.' ); $this->toggle( 'allow_edit', 'Allow code editing', 'Edit existing source files. Changes can break the site, so use a backup or staging site.' ); $this->toggle( 'allow_activate', 'Allow activation', 'Activate or deactivate installed plugins and switch the theme. WP MCP itself cannot be deactivated this way.' ); ?>
-		<div class="wpmcp-save"><button class="button button-primary button-hero">Save settings</button><span>Installation and editing also need extension access.</span></div></section>
+		<div class="wpmcp-save"><button class="button button-primary button-hero">Save settings</button><span>Installation, editing and activation also need extension access.</span></div></section>
 		</form>
 
 		<section class="wpmcp-panel"><div class="wpmcp-panel-head"><h2><?php echo $this->icon( 'key' ); ?>API key</h2><p>For apps that cannot sign in with OAuth. Anyone with this key can use the enabled tools, so treat it like a password.</p></div>
