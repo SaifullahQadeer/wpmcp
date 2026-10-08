@@ -492,21 +492,6 @@ class WPMCP_Admin {
 		return mb_strlen( $text ) > $max ? rtrim( mb_substr( $text, 0, $max - 1 ) ) . '…' : $text;
 	}
 
-	/** Big headline at the top of the Connect tab. */
-	private function render_hero() {
-		?>
-		<section class="wpmcp-hero">
-		<span class="wpmcp-eyebrow"><?php echo $this->icon( 'bolt', 14 ); // phpcs:ignore WordPress.Security.EscapeOutput -- static markup. ?> Remote MCP server for WordPress</span>
-		<h2>WordPress work. Done through <em>conversation.</em></h2>
-		<p>Connect your AI to WordPress. Create content, manage media, and update Elementor layouts from one conversation.</p>
-		<div class="wpmcp-hero-actions">
-			<a class="button button-primary" href="#wpmcp-connect">Get started</a>
-			<a class="button wpmcp-outline" href="<?php echo esc_url( $this->tab_url( 'tools' ) ); ?>">Explore the workflow <?php echo $this->icon( 'arrow', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput ?></a>
-		</div>
-		</section>
-		<?php
-	}
-
 	/** One-time "what's new" banner after an update, until the administrator dismisses it. */
 	private function render_whatsnew() {
 		if ( get_user_meta( get_current_user_id(), 'wpmcp_seen_version', true ) === WPMCP_VERSION ) { return; }
@@ -587,7 +572,7 @@ class WPMCP_Admin {
 		elseif ( 'history' === $tab ) { $this->render_history(); }
 		elseif ( 'security' === $tab ) { $this->render_security( $key ); }
 		elseif ( 'system' === $tab ) { $this->render_system( $url ); }
-		else { $this->render_hero(); $this->render_stats( $enabled ); $this->render_connect( $url ); $this->render_connected(); }
+		else { $this->render_stats( $enabled ); $this->render_connect( $url ); $this->render_connected(); }
 		?>
 		</main><aside class="wpmcp-side" aria-label="Updates and help"><?php $this->render_sidebar( $enabled ); ?></aside></div>
 		<footer class="wpmcp-footer">WP MCP · By Saifullah Qadeer</footer><p id="wpmcp-feedback" class="screen-reader-text" role="status" aria-live="polite"></p></div>

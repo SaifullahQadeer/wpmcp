@@ -3,7 +3,7 @@ Author: Saifullah Qadeer
 Requires at least: 5.6
 Requires PHP: 7.4
 Tested with Elementor: 4.x
-Stable tag: 2.9.0
+Stable tag: 2.9.1
 License: GPL-2.0-or-later
 
 Turns a WordPress site into its own remote MCP server, so Claude (web, Desktop,
@@ -138,6 +138,9 @@ wp_set_elementor also accepts "page_settings" for _elementor_page_settings, on
 its own or alongside elements.
 
 == Changelog ==
+
+= 2.9.1 =
+* Removed the headline banner from the Connect tab so the connect panel is the first thing you see.
 
 = 2.9.0 =
 * New look for the admin screen: warm off-white with coral and outlined buttons, a headline banner on the Connect tab, and icons throughout.
