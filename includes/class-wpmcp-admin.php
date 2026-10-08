@@ -273,6 +273,7 @@ class WPMCP_Admin {
 
 	/** @return array{0:bool,1:string} whether the tool can run now, and what to turn on if not. */
 	private function tool_status( $name ) {
+		if ( 0 === strpos( $name, 'wp_acf_' ) ) { return WPMCP_ACF::available() ? array( true, '' ) : array( false, 'Needs ACF' ); }
 		if ( ! in_array( $name, WPMCP_Extensions::tool_names(), true ) ) { return array( true, '' ); }
 		if ( is_multisite() ) { return array( false, 'Not supported on multisite' ); }
 		if ( '1' !== (string) get_option( 'wpmcp_extensions_enabled', '0' ) ) { return array( false, 'Turn on extension access' ); }
@@ -289,6 +290,7 @@ class WPMCP_Admin {
 			'Elementor'                => array( 'wp_get_elementor', 'wp_set_elementor' ),
 			'Divi'                     => array( 'wp_get_divi', 'wp_set_divi' ),
 			'Media & taxonomy'         => array( 'wp_upload_media', 'wp_list_media', 'wp_list_terms', 'wp_create_term' ),
+			'Advanced Custom Fields'   => array( 'wp_acf_list', 'wp_acf_save_post_type', 'wp_acf_save_taxonomy', 'wp_acf_save_field_group', 'wp_acf_delete', 'wp_acf_get_values', 'wp_acf_set_values' ),
 			'Settings & cache'         => array( 'wp_get_settings', 'wp_update_settings', 'wp_clear_cache' ),
 			'History'                  => array( 'wp_list_history', 'wp_rollback' ),
 			'Plugins & themes'         => WPMCP_Extensions::tool_names(),
@@ -462,6 +464,7 @@ class WPMCP_Admin {
 		$el      = WPMCP_Elementor::environment();
 		$divi    = WPMCP_Builders::divi_info();
 		$caches  = WPMCP_Site::detected_caches();
+		$acf     = WPMCP_ACF::status();
 		return array(
 			array( $enabled ? 'ok' : 'warn', 'MCP server', $enabled ? 'Running' : 'Paused. Turn it on in Security.' ),
 			array( $https ? 'ok' : 'warn', 'HTTPS', $https ? 'On' : 'Off. Sign-in and extension tools need it.' ),
@@ -471,6 +474,7 @@ class WPMCP_Admin {
 			array( 'ok', 'Block editor', 'Active' ),
 			array( ! empty( $el['active'] ) ? 'ok' : 'info', 'Elementor', ! empty( $el['active'] ) ? $el['version'] . ' · ' . $el['generation'] : 'Not installed' ),
 			array( ! empty( $divi['active'] ) ? 'ok' : 'info', 'Divi', ! empty( $divi['active'] ) ? $divi['version'] . ' · ' . $divi['generation'] : 'Not installed' ),
+			array( ! empty( $acf['active'] ) ? 'ok' : 'info', 'Advanced Custom Fields', ! empty( $acf['active'] ) ? 'ACF ' . $acf['version'] . ' · ' . ( 'pro' === $acf['edition'] ? 'Pro' : 'free' ) : 'Not installed' ),
 			array( $caches ? 'ok' : 'info', 'Page cache', $caches ? implode( ', ', $caches ) : 'None detected' ),
 		);
 	}
@@ -496,12 +500,14 @@ class WPMCP_Admin {
 		$el_on   = ! empty( $el['active'] );
 		$el_v4   = $el_on && 'v4-atomic' === $el['generation'];
 		$divi_on = ! empty( $divi['active'] );
+		$acf     = WPMCP_ACF::status();
 		$tiles   = array(
 			array( 'layers', 'Block editor (Gutenberg)', 'Block pages, patterns and templates, with markup checked before it is saved.', true, ! empty( $ed['gutenberg']['block_theme'] ) ? 'Block theme' : 'Active' ),
 			array( 'tools', 'Elementor 3 (classic)', 'Containers, sections and widgets, plus page settings.', $el_on && ! $el_v4, $el_on && ! $el_v4 ? $el['version'] : '' ),
 			array( 'sparkles', 'Elementor 4 (atomic)', 'Atomic editor layouts in the v4 data shape.', $el_v4, $el_v4 ? $el['version'] : '' ),
 			array( 'code', 'Divi 4 (shortcodes)', 'Sections, rows and modules, read and written section by section.', $divi_on && 'v4-shortcodes' === $divi['generation'], $divi_on && 'v4-shortcodes' === $divi['generation'] ? $divi['version'] : '' ),
 			array( 'code', 'Divi 5 (blocks)', 'Block-based layouts through the block editor tools.', $divi_on && 'v5-blocks' === $divi['generation'], $divi_on && 'v5-blocks' === $divi['generation'] ? $divi['version'] : '' ),
+			array( 'key', 'Advanced Custom Fields', 'Free and Pro: create post types, taxonomies and field groups, and read and write field values.', ! empty( $acf['active'] ), ! empty( $acf['active'] ) ? $acf['version'] . ( 'pro' === $acf['edition'] ? ' Pro' : ' free' ) : '' ),
 			array( 'book', 'Posts, pages and custom types', 'Content, media, terms and custom fields, with history and rollback.', true, 'Active' ),
 			array( 'system', 'Caches', 'Object cache, Elementor and Divi CSS, and page cache plugins such as LiteSpeed, WP Rocket and W3 Total Cache.', (bool) $caches, $caches ? implode( ', ', $caches ) : '' ),
 			array( 'key', 'Site settings and plugins', 'Title, permalinks, homepage, and plugin and theme activation (opt-in).', true, 'Active' ),

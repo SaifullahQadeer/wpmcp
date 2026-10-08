@@ -16,11 +16,11 @@ class WPMCP_Permissions {
 
 	const READ = array(
 		'wp_ping', 'wp_list_post_types', 'wp_list_content', 'wp_get_content', 'wp_get_elementor', 'wp_list_media', 'wp_list_terms',
-		'wp_list_block_types', 'wp_get_blocks', 'wp_get_divi', 'wp_get_settings', 'wp_list_history',
+		'wp_list_block_types', 'wp_get_blocks', 'wp_get_divi', 'wp_get_settings', 'wp_list_history', 'wp_acf_list', 'wp_acf_get_values',
 	);
 	const EDIT = array(
 		'wp_create_content', 'wp_update_content', 'wp_set_elementor', 'wp_set_blocks', 'wp_set_divi', 'wp_upload_media', 'wp_create_term',
-		'wp_clear_cache', 'wp_rollback',
+		'wp_clear_cache', 'wp_rollback', 'wp_acf_set_values',
 	);
 
 	public static function levels() {

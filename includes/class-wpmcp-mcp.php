@@ -337,7 +337,7 @@ class WPMCP_MCP {
 			. "Before editing code: read the existing file, preserve literal PHP tags (never HTML-encode source), run wp_edit_extension_file with dry_run=true, then apply one change at a time using the current hash. Save the returned backup_id, run wp_ping, and check the affected page. Backups can be listed and restored while WordPress still works. Stop issuing edits if responses become malformed; bootstrap failures require hosting backup, SFTP, or file-manager recovery. Never claim this connector can repair every outage.\n"
 			. "Call wp_ping first: it reports the Elementor version and editor generation (v3 classic vs v4 atomic), which decides the JSON shape wp_set_elementor expects.\n"
 			. "Every change you make is recorded. If the user asks to undo something, call wp_list_history to find it and wp_rollback to reverse it; if wp_rollback reports the item was edited since, tell the user before using force.\n"
-			. "Check a page's \"builder\" (from wp_get_content or wp_ping) before editing its layout: gutenberg pages use wp_get_blocks and wp_set_blocks (block markup, checked before saving), elementor pages use wp_get_elementor and wp_set_elementor, divi pages use wp_get_divi and wp_set_divi, and classic pages use wp_update_content. Do not mix editors on one page. After changing layouts, settings or plugins, call wp_clear_cache if the front end does not show the change.\n"
+			. "Check a page's \"builder\" (from wp_get_content or wp_ping) before editing its layout: gutenberg pages use wp_get_blocks and wp_set_blocks (block markup, checked before saving), elementor pages use wp_get_elementor and wp_set_elementor, divi pages use wp_get_divi and wp_set_divi, and classic pages use wp_update_content. Do not mix editors on one page. For Advanced Custom Fields call wp_acf_list first: create post types and taxonomies with wp_acf_save_post_type and wp_acf_save_taxonomy, fields with wp_acf_save_field_group, and set values with wp_acf_set_values or the \"acf\" argument of wp_create_content (never write ACF values as plain meta). After changing layouts, settings or plugins, call wp_clear_cache if the front end does not show the change.\n"
 			. "Elementor layouts can be very large. Read them with wp_get_elementor using summary=true first, then fetch one section at a time with index=N. Write them back section by section using the __append__ or __replace__ markers rather than resending the whole tree.";
 	}
 
@@ -546,6 +546,27 @@ class WPMCP_MCP {
 			case 'wp_update_settings':
 				return WPMCP_Site::update_settings( isset( $args['settings'] ) ? $args['settings'] : null );
 
+			case 'wp_acf_list':
+				return WPMCP_ACF::list_items( isset( $args['what'] ) ? $args['what'] : '', isset( $args['key'] ) ? (string) $args['key'] : '', ! empty( $args['include_fields'] ) );
+
+			case 'wp_acf_save_post_type':
+				return WPMCP_ACF::save_post_type( $args );
+
+			case 'wp_acf_save_taxonomy':
+				return WPMCP_ACF::save_taxonomy( $args );
+
+			case 'wp_acf_save_field_group':
+				return WPMCP_ACF::save_field_group( $args );
+
+			case 'wp_acf_delete':
+				return isset( $args['kind'], $args['key'] ) ? WPMCP_ACF::delete_item( (string) $args['kind'], (string) $args['key'] ) : new WP_Error( 'wpmcp_missing_arg', 'Missing "kind" or "key".' );
+
+			case 'wp_acf_get_values':
+				return isset( $args['id'] ) ? WPMCP_ACF::get_values( $args['id'], ! empty( $args['format'] ) ) : new WP_Error( 'wpmcp_missing_arg', 'Missing "id".' );
+
+			case 'wp_acf_set_values':
+				return isset( $args['id'], $args['values'] ) ? WPMCP_ACF::set_values( $args['id'], $args['values'] ) : new WP_Error( 'wpmcp_missing_arg', 'Missing "id" or "values".' );
+
 			case 'wp_list_history':
 				$per_page = isset( $args['per_page'] ) ? max( 1, min( 50, (int) $args['per_page'] ) ) : 20;
 				$page     = isset( $args['page'] ) ? max( 1, (int) $args['page'] ) : 1;
@@ -630,6 +651,7 @@ class WPMCP_MCP {
 			'featured_media' => array( 'type' => 'integer', 'description' => 'Attachment ID for featured image.' ),
 			'meta'           => array( 'type' => 'object', 'description' => 'Custom fields as key/value.' ),
 			'terms'          => array( 'type' => 'object', 'description' => 'Taxonomy terms, e.g. {"category":[3]}.' ),
+			'acf'            => array( 'type' => 'object', 'description' => 'Advanced Custom Fields values by field name, saved through ACF, e.g. {"price":29,"author":"Ann"}. Needs ACF and a field group that applies to this item. Use this instead of meta for ACF fields.' ),
 			'elementor'      => array( 'type' => 'array', 'items' => array( 'type' => 'object' ), 'description' => 'Elementor page structure (the _elementor_data array).' ),
 		);
 	}
@@ -871,6 +893,97 @@ class WPMCP_MCP {
 				'description' => 'Read common site settings: title, tagline, timezone, date and time format, posts per page, homepage and posts page, search engine visibility, default comment status and permalink structure.',
 				'inputSchema' => self::obj( array() ),
 				'annotations' => self::ann( 'Read site settings', true, false, true ),
+			),
+			array(
+				'name'        => 'wp_acf_list',
+				'title'       => 'List ACF setup',
+				'description' => 'Read what Advanced Custom Fields (free or Pro) has on this site: field groups (with where they appear, and their fields when include_fields is true), ACF post types, ACF taxonomies, options pages (Pro) and the field types available. With "what" and "key" it returns one full definition. Call this before creating fields or setting values.',
+				'inputSchema' => self::obj( array(
+					'what'           => array( 'type' => 'string', 'enum' => array( 'field_groups', 'post_types', 'taxonomies', 'options_pages', 'field_types' ), 'description' => 'Which part to read. Omit for a summary of everything.' ),
+					'key'            => array( 'type' => 'string', 'description' => 'With "what" of field_groups, post_types or taxonomies: the item\'s key, to read its full definition.' ),
+					'include_fields' => array( 'type' => 'boolean', 'description' => 'Include each group\'s fields (names, labels, types, choices, sub fields).' ),
+				) ),
+				'annotations' => self::ann( 'List ACF setup', true, false, true ),
+			),
+			array(
+				'name'        => 'wp_acf_save_post_type',
+				'title'       => 'Create or update an ACF post type',
+				'description' => 'Create or update a custom post type through ACF, so it appears in ACF and is registered at once. Give post_type (the slug, up to 20 characters), singular and plural names, and optional settings (public, hierarchical, supports, taxonomies, has_archive, show_in_rest, menu_icon, menu_position, rewrite and more). Labels are generated from the names. An existing ACF post type with the same slug is updated. Use dry_run to preview. Then add fields with wp_acf_save_field_group and create items with wp_create_content.',
+				'inputSchema' => self::obj( array(
+					'post_type' => array( 'type' => 'string', 'description' => 'Slug, e.g. "book". Lowercase letters, numbers, underscores, dashes; up to 20 characters.' ),
+					'singular'  => array( 'type' => 'string', 'description' => 'Singular name, e.g. "Book". Needed when creating.' ),
+					'plural'    => array( 'type' => 'string', 'description' => 'Plural name, e.g. "Books". Needed when creating.' ),
+					'settings'  => array( 'type' => 'object', 'description' => 'Optional: description, public, hierarchical, supports (title, editor, thumbnail, excerpt, custom-fields, comments, revisions, page-attributes...), taxonomies, has_archive, has_archive_slug, show_in_rest, rest_base, show_in_menu, menu_icon (dashicons-book), menu_position, rewrite {slug, with_front}, labels (overrides).' ),
+					'active'    => array( 'type' => 'boolean', 'description' => 'false turns the post type off without deleting it.' ),
+					'dry_run'   => array( 'type' => 'boolean', 'description' => 'Return the configuration without saving.' ),
+				), array( 'post_type' ) ),
+				'annotations' => self::ann( 'Create or update an ACF post type', false, true, false ),
+			),
+			array(
+				'name'        => 'wp_acf_save_taxonomy',
+				'title'       => 'Create or update an ACF taxonomy',
+				'description' => 'Create or update a custom taxonomy through ACF. Give taxonomy (the slug, up to 32 characters), singular and plural names, and post_types it applies to. Optional settings include hierarchical, show_in_rest, show_admin_column, rewrite. Names that WordPress reserves are refused. Use dry_run to preview.',
+				'inputSchema' => self::obj( array(
+					'taxonomy'   => array( 'type' => 'string', 'description' => 'Slug, e.g. "genre".' ),
+					'singular'   => array( 'type' => 'string', 'description' => 'Singular name, e.g. "Genre".' ),
+					'plural'     => array( 'type' => 'string', 'description' => 'Plural name, e.g. "Genres".' ),
+					'post_types' => array( 'type' => 'array', 'items' => array( 'type' => 'string' ), 'description' => 'Post types it applies to, e.g. ["book"]. They must already exist.' ),
+					'settings'   => array( 'type' => 'object', 'description' => 'Optional: description, public, hierarchical, show_ui, show_in_menu, show_in_nav_menus, show_in_rest, rest_base, show_tagcloud, show_in_quick_edit, show_admin_column, rewrite {slug, with_front, rewrite_hierarchical}, labels.' ),
+					'active'     => array( 'type' => 'boolean', 'description' => 'false turns the taxonomy off without deleting it.' ),
+					'dry_run'    => array( 'type' => 'boolean', 'description' => 'Return the configuration without saving.' ),
+				), array( 'taxonomy' ) ),
+				'annotations' => self::ann( 'Create or update an ACF taxonomy', false, true, false ),
+			),
+			array(
+				'name'        => 'wp_acf_save_field_group',
+				'title'       => 'Create or update an ACF field group',
+				'description' => 'Create or update an ACF field group with its fields. fields is a list of {name, label, type, ...} using ACF field settings (required, instructions, default_value, choices for select/radio/checkbox, min/max, return_format, etc.); repeater and group fields take sub_fields, flexible_content takes layouts [{name, label, sub_fields}]. Repeater, flexible content, gallery and clone need ACF Pro and are refused on the free plugin. Keys are generated. Say where the fields appear with "post_type": "book" or a location list. For an existing group (pass its key) the fields you send replace its fields, so read it first with wp_acf_list. Use dry_run to preview.',
+				'inputSchema' => self::obj( array(
+					'key'        => array( 'type' => 'string', 'description' => 'Existing group key (group_...) to update. Omit to create.' ),
+					'title'      => array( 'type' => 'string', 'description' => 'Group title.' ),
+					'post_type'  => array( 'type' => 'string', 'description' => 'Shortcut location: show on this post type. A list of post types is also accepted.' ),
+					'location'   => array( 'type' => 'array', 'description' => 'ACF location rule groups: [[{"param":"post_type","operator":"==","value":"book"}]]. Groups are OR, rules inside a group are AND.' ),
+					'fields'     => array( 'type' => 'array', 'items' => array( 'type' => 'object' ), 'description' => 'Field definitions.' ),
+					'position'   => array( 'type' => 'string', 'enum' => array( 'acf_after_title', 'normal', 'side' ) ),
+					'style'      => array( 'type' => 'string', 'enum' => array( 'default', 'seamless' ) ),
+					'label_placement' => array( 'type' => 'string', 'enum' => array( 'top', 'left' ) ),
+					'instruction_placement' => array( 'type' => 'string', 'enum' => array( 'label', 'field' ) ),
+					'show_in_rest' => array( 'type' => 'boolean', 'description' => 'Expose the fields in the REST API.' ),
+					'active'     => array( 'type' => 'boolean' ),
+					'description' => array( 'type' => 'string' ),
+					'dry_run'    => array( 'type' => 'boolean', 'description' => 'Return the group without saving.' ),
+				) ),
+				'annotations' => self::ann( 'Create or update an ACF field group', false, true, false ),
+			),
+			array(
+				'name'        => 'wp_acf_delete',
+				'title'       => 'Delete an ACF definition',
+				'description' => 'Delete an ACF post type, taxonomy or field group by key. Content already saved stays in the database; only the definition goes. It is recorded in the history and can be rolled back.',
+				'inputSchema' => self::obj( array(
+					'kind' => array( 'type' => 'string', 'enum' => array( 'post_type', 'taxonomy', 'field_group' ) ),
+					'key'  => array( 'type' => 'string', 'description' => 'The item\'s ACF key, from wp_acf_list.' ),
+				), array( 'kind', 'key' ) ),
+				'annotations' => self::ann( 'Delete an ACF definition', false, true, false ),
+			),
+			array(
+				'name'        => 'wp_acf_get_values',
+				'title'       => 'Read ACF field values',
+				'description' => 'Read the ACF field values of a post (numeric id), an options page (id "option"), a user (user_5) or a term (category_3). By default values are raw (image fields give an attachment ID); set format=true for ACF\'s formatted output.',
+				'inputSchema' => self::obj( array(
+					'id'     => array( 'type' => array( 'integer', 'string' ), 'description' => 'Post ID, "option", user_{id} or {taxonomy}_{term id}.' ),
+					'format' => array( 'type' => 'boolean', 'description' => 'Return formatted values.' ),
+				), array( 'id' ) ),
+				'annotations' => self::ann( 'Read ACF field values', true, false, true ),
+			),
+			array(
+				'name'        => 'wp_acf_set_values',
+				'title'       => 'Set ACF field values',
+				'description' => 'Set ACF field values through ACF itself, so repeaters, relationships and the hidden field references are saved correctly. values is {field_name: value}. Every name must be an ACF field that applies to the target, otherwise nothing is saved. Formats: text and numbers as is; true_false as true/false; image/file as an attachment ID; relationship, post_object and taxonomy as IDs; date_picker as Ymd (20261231); repeater as a list of row objects keyed by sub field name. Recorded in the history and can be rolled back.',
+				'inputSchema' => self::obj( array(
+					'id'     => array( 'type' => array( 'integer', 'string' ), 'description' => 'Post ID, "option", user_{id} or {taxonomy}_{term id}.' ),
+					'values' => array( 'type' => 'object', 'description' => 'Field names and their new values.' ),
+				), array( 'id', 'values' ) ),
+				'annotations' => self::ann( 'Set ACF field values', false, false, true ),
 			),
 			array(
 				'name'        => 'wp_update_settings',

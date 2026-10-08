@@ -86,6 +86,7 @@ class WPMCP_Core {
 		}
 	}
 
+	/** Saves featured image, meta, terms, Elementor data and ACF values. Returns the ACF outcome, or null when none was sent. */
 	private static function apply_post_extras( $post_id, $body ) {
 		if ( isset( $body['featured_media'] ) ) {
 			set_post_thumbnail( $post_id, (int) $body['featured_media'] );
@@ -107,6 +108,19 @@ class WPMCP_Core {
 			}
 			WPMCP_Elementor::set_data( $post_id, $elements );
 		}
+		$acf = null;
+		if ( isset( $body['acf'] ) && is_array( $body['acf'] ) ) {
+			$acf = WPMCP_ACF::set_values( $post_id, $body['acf'] );
+		}
+		return $acf;
+	}
+
+	/** Add the ACF outcome to a content result: what was set, or why it was not. */
+	private static function with_acf( $result, $acf ) {
+		if ( null !== $acf ) {
+			$result['acf'] = is_wp_error( $acf ) ? array( 'ok' => false, 'error' => $acf->get_error_message() ) : $acf;
+		}
+		return $result;
 	}
 
 	private static function validate_type( $type ) {
@@ -143,6 +157,7 @@ class WPMCP_Core {
 			'elementor'          => WPMCP_Elementor::environment(),
 			'editors'            => WPMCP_Builders::environment(),
 			'cache_plugins'      => WPMCP_Site::detected_caches(),
+			'acf'                => WPMCP_ACF::status(),
 			'max_result_chars'   => (int) apply_filters( 'wpmcp_max_result_chars', WPMCP_MAX_RESULT_CHARS ),
 			'post_types'         => $types,
 		);
@@ -239,13 +254,13 @@ class WPMCP_Core {
 		if ( is_wp_error( $post_id ) ) {
 			return $post_id;
 		}
-		self::apply_post_extras( $post_id, $body );
+		$acf = self::apply_post_extras( $post_id, $body );
 		WPMCP_History::record( 'wp_create_content', 'post', $post_id, $postarr['post_title'], sprintf( 'Created %s', $type ), array( 'op' => 'trash_created' ) );
 
-		return array(
+		return self::with_acf( array(
 			'ok'   => true,
 			'post' => self::format_post( get_post( $post_id ), true ),
-		);
+		), $acf );
 	}
 
 	public static function update_content( $type, $id, $body ) {
@@ -283,14 +298,14 @@ class WPMCP_Core {
 		if ( is_wp_error( $result ) ) {
 			return $result;
 		}
-		self::apply_post_extras( (int) $id, $body );
+		$acf     = self::apply_post_extras( (int) $id, $body );
 		$changed = array_values( array_intersect( array_keys( $body ), array( 'title', 'content', 'excerpt', 'status', 'slug', 'parent', 'menu_order', 'featured_media', 'meta', 'terms', 'elementor' ) ) );
 		WPMCP_History::finish_state( $history, 'wp_update_content', sprintf( 'Updated %s (%s)', $type, implode( ', ', $changed ) ) );
 
-		return array(
+		return self::with_acf( array(
 			'ok'   => true,
 			'post' => self::format_post( get_post( (int) $id ), true ),
-		);
+		), $acf );
 	}
 
 	public static function delete_content( $type, $id, $force = false ) {

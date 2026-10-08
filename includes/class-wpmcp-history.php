@@ -305,6 +305,12 @@ class WPMCP_History {
 		} elseif ( 'delete_term' === $op ) {
 			$deleted = wp_delete_term( (int) $data['term_id'], $data['taxonomy'] );
 			$result  = true === $deleted ? true : new WP_Error( 'wpmcp_failed', 'Could not delete the term.' );
+		} elseif ( 'acf_delete' === $op ) {
+			$result = WPMCP_ACF::undo_create( $data['kind'], $data['key'] );
+		} elseif ( 'acf_restore' === $op ) {
+			$result = WPMCP_ACF::restore( $data['kind'], $data['data'] );
+		} elseif ( 'acf_values' === $op ) {
+			$result = WPMCP_ACF::restore_values( $data, $row['after_hash'], $force );
 		} elseif ( 'restore_options' === $op ) {
 			$result = WPMCP_Site::restore_options( $data['values'] );
 		} elseif ( 'set_active' === $op ) {

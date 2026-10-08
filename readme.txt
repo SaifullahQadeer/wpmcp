@@ -3,7 +3,7 @@ Author: Saifullah Qadeer
 Requires at least: 5.6
 Requires PHP: 7.4
 Tested with Elementor: 4.x
-Stable tag: 2.11.4
+Stable tag: 2.12.0
 License: GPL-2.0-or-later
 
 Turns a WordPress site into its own remote MCP server, so Claude (web, Desktop,
@@ -40,7 +40,7 @@ keys are not accepted.
 Requirements: the site must be on HTTPS, and permalinks must not be set to
 "Plain" (otherwise /wp-json/ 404s).
 
-== Tools (31) ==
+== Tools (38) ==
 
 wp_ping, wp_list_post_types, wp_list_content, wp_get_content, wp_create_content,
 wp_update_content, wp_delete_content, wp_get_elementor, wp_set_elementor,
@@ -49,7 +49,27 @@ wp_list_extensions, wp_install_extension, wp_list_extension_files,
 wp_read_extension_file, wp_edit_extension_file, wp_list_file_backups,
 wp_restore_extension_file, wp_set_extension_active, wp_list_history, wp_rollback,
 wp_list_block_types, wp_get_blocks, wp_set_blocks, wp_get_divi, wp_set_divi,
-wp_clear_cache, wp_get_settings, wp_update_settings.
+wp_clear_cache, wp_get_settings, wp_update_settings, wp_acf_list, wp_acf_save_post_type,
+wp_acf_save_taxonomy, wp_acf_save_field_group, wp_acf_delete, wp_acf_get_values,
+wp_acf_set_values.
+
+== Advanced Custom Fields ==
+
+Works with the free ACF plugin (6.1 or newer for post types and taxonomies) and ACF Pro. Everything
+goes through ACF's own functions, so ACF registers post types and taxonomies itself and keeps its
+field references correct.
+
+wp_acf_list reads field groups (and their fields), ACF post types, taxonomies, options pages (Pro)
+and the field types available. wp_acf_save_post_type and wp_acf_save_taxonomy create or update
+custom post types and taxonomies from a slug, singular and plural names and a small set of
+checked settings; WordPress's reserved names and names owned by another plugin are refused.
+wp_acf_save_field_group creates or updates a field group and its fields from a plain description
+(repeater, flexible content, gallery and clone need ACF Pro and are refused on the free plugin).
+wp_acf_get_values and wp_acf_set_values read and write field values for posts, options pages,
+users and terms, and wp_create_content and wp_update_content accept an "acf" object. Setting a
+value that no ACF field defines is refused rather than saved as loose meta. Every change is in
+the history and can be rolled back. Creating or deleting post types, taxonomies and field groups
+needs Full access; setting values needs Read and edit; reading needs Read only.
 
 == Access levels ==
 
@@ -192,6 +212,11 @@ The admin screen bundles the Inter typeface (SIL Open Font License 1.1, see
 assets/fonts/Inter-LICENSE.txt). Nothing is loaded from external servers.
 
 == Changelog ==
+
+= 2.12.0 =
+* Advanced Custom Fields support, for the free plugin and ACF Pro: create and update custom post types, taxonomies and field groups, and read and write field values, through ACF's own functions. Seven new tools (38 in total).
+* wp_create_content and wp_update_content take an acf object so a post and its custom fields are saved in one call.
+* ACF changes are recorded in the history and can be rolled back; the Works with section and System health show whether ACF is installed.
 
 = 2.11.4 =
 * The header icon is now the updated WP MCP mark in the brand orange.
