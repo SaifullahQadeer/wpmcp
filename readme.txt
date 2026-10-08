@@ -128,6 +128,10 @@ its own or alongside elements.
 == Changelog ==
 
 = Unreleased =
+* Updates are offered in the WordPress Plugins screen from GitHub releases
+  (SaifullahQadeer/wpmcp). Publish a release tagged vX.Y.Z with a version
+  higher than the installed one. For a private repository, define
+  WPMCP_GITHUB_TOKEN in wp-config.php with a read-only token.
 * WP MCP now has its own top-level admin menu instead of a Settings submenu,
   plus a Settings link before Deactivate on the Plugins screen.
 * Missing or invalid API keys return 403 on every route, not 401.

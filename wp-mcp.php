@@ -8,6 +8,7 @@
  * Text Domain:       wp-mcp
  * Requires at least: 5.6
  * Requires PHP:      7.4
+ * Update URI:        https://github.com/SaifullahQadeer/wpmcp
  *
  * Elementor tested up to: 4.x
  */
@@ -36,6 +37,7 @@ require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-core.php';
 require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-rest.php';
 require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-mcp.php';
 require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-admin.php';
+require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-updater.php';
 
 /**
  * On activation: generate an API key if one does not exist yet.
@@ -61,6 +63,7 @@ register_activation_hook( __FILE__, 'wpmcp_activate' );
 function wpmcp_init() {
 	( new WPMCP_REST() )->register_hooks();
 	( new WPMCP_MCP() )->register_hooks();
+	( new WPMCP_Updater() )->register_hooks(); // Not admin-only: scheduled update checks run in cron.
 	if ( is_admin() ) {
 		( new WPMCP_Admin() )->register_hooks();
 	}
