@@ -3,7 +3,7 @@ Author: Saifullah Qadeer
 Requires at least: 5.6
 Requires PHP: 7.4
 Tested with Elementor: 4.x
-Stable tag: 2.11.2
+Stable tag: 2.11.3
 License: GPL-2.0-or-later
 
 Turns a WordPress site into its own remote MCP server, so Claude (web, Desktop,
@@ -192,6 +192,9 @@ The admin screen bundles the Inter typeface (SIL Open Font License 1.1, see
 assets/fonts/Inter-LICENSE.txt). Nothing is loaded from external servers.
 
 == Changelog ==
+
+= 2.11.3 =
+* The admin header now shows the WP MCP icon instead of a generic bolt. The image is bundled with the plugin.
 
 = 2.11.2 =
 * The note beside Save settings now says activation, as well as installation and editing, needs extension access.

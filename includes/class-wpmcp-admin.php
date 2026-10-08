@@ -635,7 +635,7 @@ class WPMCP_Admin {
 		$icons   = array( 'connect' => 'connect', 'tools' => 'tools', 'history' => 'history', 'security' => 'shield', 'system' => 'system' );
 		?>
 		<div class="wrap wpmcp">
-		<header class="wpmcp-header"><div class="wpmcp-brand"><span class="wpmcp-mark"><?php echo $this->icon( 'bolt', 22 ); // phpcs:ignore WordPress.Security.EscapeOutput ?></span><div><h1>WP MCP <span>v<?php echo esc_html( WPMCP_VERSION ); ?></span></h1><p>Let AI apps manage your WordPress site, with you in control.</p></div></div>
+		<header class="wpmcp-header"><div class="wpmcp-brand"><img class="wpmcp-logo" src="<?php echo esc_url( WPMCP_PLUGIN_URL . 'assets/brand/wp-mcp-icon.png' ); ?>" width="254" height="36" alt="" /><div><h1>WP MCP <span>v<?php echo esc_html( WPMCP_VERSION ); ?></span></h1><p>Let AI apps manage your WordPress site, with you in control.</p></div></div>
 		<div class="wpmcp-header-side"><?php if ( $new ) : ?><a class="wpmcp-pill wpmcp-pill-warn" href="<?php echo esc_url( $this->tab_url( 'system' ) ); ?>">Update available: <?php echo esc_html( $new ); ?></a><?php endif; ?></div></header>
 		<nav class="wpmcp-tabs" aria-label="WP MCP sections"><?php foreach ( $this->tabs() as $id => $label ) : ?><a href="<?php echo esc_url( $this->tab_url( $id ) ); ?>"<?php echo $id === $tab ? ' class="is-active" aria-current="page"' : ''; ?>><?php echo $this->icon( $icons[ $id ], 17 ); // phpcs:ignore WordPress.Security.EscapeOutput ?><?php echo esc_html( $label ); ?></a><?php endforeach; ?></nav>
 		<?php echo $this->update_notice_markup(); // phpcs:ignore WordPress.Security.EscapeOutput -- escaped inside. ?>
