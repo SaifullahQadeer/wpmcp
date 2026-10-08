@@ -3,7 +3,7 @@ Author: Saifullah Qadeer
 Requires at least: 5.6
 Requires PHP: 7.4
 Tested with Elementor: 4.x
-Stable tag: 2.10.0
+Stable tag: 2.10.1
 License: GPL-2.0-or-later
 
 Turns a WordPress site into its own remote MCP server, so Claude (web, Desktop,
@@ -177,6 +177,11 @@ The admin screen bundles the Inter typeface (SIL Open Font License 1.1, see
 assets/fonts/Inter-LICENSE.txt). Nothing is loaded from external servers.
 
 == Changelog ==
+
+= 2.10.1 =
+* Cleaner admin screen: notices from other plugins no longer appear on it, the server status pill and footer credit are gone, and the focus outline on tabs no longer shows a blue box.
+* The Tools tab is now a compact list (name, access level, and why a tool is off) instead of a table with descriptions; hover a row for what it does.
+* Show and copy are icon buttons, and collapsible sections use a chevron.
 
 = 2.10.0 =
 * Block editor (Gutenberg) tools: read blocks as an outline or one block at a time, and write block markup with replace, append, prepend, insert and replace-block modes. Markup is validated before saving.

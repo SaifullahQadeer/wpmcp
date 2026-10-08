@@ -29,7 +29,9 @@ html{scroll-behavior:smooth}
 .wpmcp-tabs a:hover{color:var(--ink)}
 .wpmcp-tabs a.is-active{color:var(--ink);border-bottom-color:var(--accent)}
 .wpmcp-tabs a.is-active .wpmcp-icon{color:var(--accent)}
-.wpmcp-tabs a:focus-visible,.wpmcp button:focus-visible,.wpmcp summary:focus-visible,.wpmcp a.button:focus-visible,.wpmcp-toggle input:focus-visible+.wpmcp-switch{outline:2px solid var(--accent);outline-offset:2px}
+.wpmcp a:focus,.wpmcp button:focus,.wpmcp summary:focus{outline:0;box-shadow:none}
+.wpmcp-tabs a:focus-visible,.wpmcp button:focus-visible,.wpmcp summary:focus-visible,.wpmcp a.button:focus-visible,.wpmcp-toggle input:focus-visible+.wpmcp-switch{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+.wpmcp-tabs a:focus:not(:focus-visible){outline:0;box-shadow:none}
 
 /* Layout */
 .wpmcp-grid{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:24px;align-items:start}
@@ -161,3 +163,33 @@ html{scroll-behavior:smooth}
 @media(max-width:1080px){.wpmcp-grid{grid-template-columns:minmax(0,1fr)}.wpmcp-side{position:static;display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:900px){.wpmcp-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.wpmcp-table{display:block;overflow-x:auto}.wpmcp-banner{flex-wrap:wrap}}
 @media(max-width:640px){.wpmcp{margin:16px 10px}.wpmcp-header{flex-direction:column;align-items:flex-start}.wpmcp-header-side{justify-content:flex-start}.wpmcp-panel{padding:20px}.wpmcp-side{grid-template-columns:minmax(0,1fr)}.wpmcp-copy{flex-wrap:wrap}.wpmcp-copy input{flex-basis:100%}.wpmcp-save{flex-direction:column;align-items:flex-start}.wpmcp-kv th{width:110px}}
+
+/* Notices from other plugins stay off this screen; ours carry .wpmcp-notice */
+body.toplevel_page_wp-mcp #wpbody-content .notice:not(.wpmcp-notice),body.toplevel_page_wp-mcp #wpbody-content div.updated:not(.wpmcp-notice),body.toplevel_page_wp-mcp #wpbody-content div.error:not(.wpmcp-notice),body.toplevel_page_wp-mcp #wpbody-content .update-nag{display:none!important}
+.wpmcp .wpmcp-notice{margin:0 0 16px;background:var(--card);border:1px solid var(--line);border-left-width:4px;box-shadow:none}
+
+/* Chevron on collapsible sections */
+.wpmcp summary{list-style:none;display:inline-flex;align-items:center;gap:8px}
+.wpmcp summary::-webkit-details-marker{display:none}
+.wpmcp summary:before{content:"";width:7px;height:7px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(-45deg);transition:transform .15s;margin:0 2px 0 3px}
+.wpmcp details[open]>summary:before{transform:rotate(45deg)}
+
+/* Icon-only buttons (show, copy) */
+.wpmcp .wpmcp-icon-btn{width:40px;min-width:40px;padding:0;justify-content:center;gap:0}
+.wpmcp-icon-btn .wpmcp-eye-off,.wpmcp-icon-btn .wpmcp-done-icon{display:none}
+.wpmcp-icon-btn span{display:inline-flex}
+.wpmcp-icon-btn[aria-pressed=true] .wpmcp-eye{display:none}
+.wpmcp-icon-btn[aria-pressed=true] .wpmcp-eye-off{display:inline-flex}
+.wpmcp-icon-btn.is-done .wpmcp-copy-icon{display:none}
+.wpmcp-icon-btn.is-done .wpmcp-done-icon{display:inline-flex;color:var(--ok)}
+
+/* Compact tool list */
+.wpmcp-toollist{list-style:none;margin:0;padding:0}
+.wpmcp-toollist li{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:10px 2px;border-bottom:1px solid #f1ede6}
+.wpmcp-toollist li:last-child{border-bottom:0}
+.wpmcp-tool-main{display:flex;align-items:baseline;gap:10px;min-width:0;flex-wrap:wrap}
+.wpmcp-tool-main strong{font-weight:600;font-size:13px}
+.wpmcp-tool-main code{font-size:11px;color:var(--muted);background:transparent;padding:0}
+.wpmcp-tool-meta{display:flex;align-items:center;gap:10px;flex:none}
+.wpmcp-toollist .is-off .wpmcp-tool-main strong{color:var(--muted)}
+.wpmcp-toollist .wpmcp-why{margin:0}

@@ -9,6 +9,7 @@ class WPMCP_Admin {
 		add_action( 'admin_init', array( $this, 'handle_update_check' ) );
 		add_action( 'wp_ajax_wpmcp_status', array( $this, 'ajax_status' ) );
 		add_action( 'admin_notices', array( $this, 'update_notice' ) );
+		add_action( 'in_admin_header', array( $this, 'suppress_notices' ), 1000 );
 		add_filter( 'plugin_action_links_' . plugin_basename( WPMCP_PLUGIN_FILE ), array( $this, 'action_links' ) );
 	}
 
@@ -25,14 +26,24 @@ class WPMCP_Admin {
 		wp_safe_redirect( add_query_arg( array( 'wpmcp_update_result' => $found['result'], 'wpmcp_update_version' => rawurlencode( $found['version'] ) ), $target ) );
 		exit;
 	}
-	public function update_notice() {
-		if ( ! isset( $_GET['wpmcp_update_result'] ) || ! current_user_can( 'update_plugins' ) ) { return; }
+	/** Result of the last "Check for updates" click, as a notice, or ''. */
+	private function update_notice_markup() {
+		if ( ! isset( $_GET['wpmcp_update_result'] ) || ! current_user_can( 'update_plugins' ) ) { return ''; }
 		$version = isset( $_GET['wpmcp_update_version'] ) ? preg_replace( '/[^0-9A-Za-z.-]/', '', wp_unslash( $_GET['wpmcp_update_version'] ) ) : '';
 		$result  = sanitize_key( wp_unslash( $_GET['wpmcp_update_result'] ) );
 		if ( 'available' === $result ) { $class = 'notice-warning'; $text = 'WP MCP ' . $version . ' is available. Use the Update now link on the WP MCP row of the Plugins screen.'; }
 		elseif ( 'current' === $result ) { $class = 'notice-success'; $text = 'WP MCP is up to date (version ' . $version . ').'; }
 		else { $class = 'notice-error'; $text = 'Could not reach GitHub to check for updates. Try again in a few minutes.'; }
-		echo '<div class="notice ' . esc_attr( $class ) . ' is-dismissible"><p>' . esc_html( $text ) . '</p></div>';
+		return '<div class="notice inline wpmcp-notice ' . esc_attr( $class ) . '"><p>' . esc_html( $text ) . '</p></div>';
+	}
+	public function update_notice() {
+		echo str_replace( 'notice inline wpmcp-notice', 'notice is-dismissible', $this->update_notice_markup() ); // phpcs:ignore WordPress.Security.EscapeOutput -- escaped in update_notice_markup().
+	}
+	/** Other plugins' notices do not belong on this screen. */
+	public function suppress_notices() {
+		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+		if ( ! $screen || 'toplevel_page_wp-mcp' !== $screen->id ) { return; }
+		foreach ( array( 'admin_notices', 'all_admin_notices', 'user_admin_notices', 'network_admin_notices' ) as $hook ) { remove_all_actions( $hook ); }
 	}
 	public function add_menu() { add_menu_page( 'WP MCP', 'WP MCP', 'manage_options', 'wp-mcp', array( $this, 'render_page' ), 'dashicons-rest-api', 80 ); }
 	/** Put a Settings link before Deactivate on the Plugins screen. */
@@ -125,8 +136,8 @@ class WPMCP_Admin {
 		?>
 		<label class="wpmcp-label" for="<?php echo esc_attr( $id ); ?>"><?php echo esc_html( $label ); ?></label>
 		<div class="wpmcp-copy"><input id="<?php echo esc_attr( $id ); ?>" type="<?php echo $secret ? 'password' : 'text'; ?>" readonly autocomplete="off" value="<?php echo esc_attr( $value ); ?>" />
-		<?php if ( $secret ) : ?><button type="button" class="button" data-reveal="<?php echo esc_attr( $id ); ?>" aria-pressed="false">Show</button><?php endif; ?>
-		<button type="button" class="button" data-copy="<?php echo esc_attr( $id ); ?>">Copy</button></div>
+		<?php if ( $secret ) : ?><button type="button" class="button wpmcp-icon-btn" data-reveal="<?php echo esc_attr( $id ); ?>" aria-pressed="false" aria-label="Show" title="Show"><span class="wpmcp-eye"><?php echo $this->icon( 'eye', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput ?></span><span class="wpmcp-eye-off"><?php echo $this->icon( 'eye-off', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput ?></span></button><?php endif; ?>
+		<button type="button" class="button wpmcp-icon-btn" data-copy="<?php echo esc_attr( $id ); ?>" aria-label="Copy" title="Copy"><span class="wpmcp-copy-icon"><?php echo $this->icon( 'copy', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput ?></span><span class="wpmcp-done-icon"><?php echo $this->icon( 'tick', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput ?></span></button></div>
 		<?php
 	}
 	private function toggle( $key, $title, $description, $default = '0' ) {
@@ -227,7 +238,7 @@ class WPMCP_Admin {
 			<ol><li>Add the URL as a remote MCP server or custom connector, with OAuth sign-in if the app asks.</li><li>Click <strong>Approve</strong> on the page this site opens.</li><li>If the app cannot sign in, use an API key from the Security tab.</li></ol>
 		</div>
 		<details class="wpmcp-manual"><summary>Server URL</summary><?php $this->field( 'wpmcp-endpoint', 'Paste this where an app asks for a server or connector URL', $url ); ?></details>
-		<?php if ( ! WPMCP_OAuth::enabled() ) : ?><div class="notice notice-warning inline"><p>OAuth sign-in is off<?php echo 'https' !== wp_parse_url( home_url(), PHP_URL_SCHEME ) ? ' because this site is not on HTTPS' : ''; ?>. Turn it on in the Security tab, or connect with an API key.</p></div><?php endif; ?>
+		<?php if ( ! WPMCP_OAuth::enabled() ) : ?><div class="notice inline wpmcp-notice notice-warning"><p>OAuth sign-in is off<?php echo 'https' !== wp_parse_url( home_url(), PHP_URL_SCHEME ) ? ' because this site is not on HTTPS' : ''; ?>. Turn it on in the Security tab, or connect with an API key.</p></div><?php endif; ?>
 		</section>
 		<?php
 	}
@@ -265,35 +276,39 @@ class WPMCP_Admin {
 
 	private function render_tools() {
 		$groups = array(
-			'Site & content'          => array( 'wp_ping', 'wp_list_post_types', 'wp_list_content', 'wp_get_content', 'wp_create_content', 'wp_update_content', 'wp_delete_content' ),
+			'Site & content'           => array( 'wp_ping', 'wp_list_post_types', 'wp_list_content', 'wp_get_content', 'wp_create_content', 'wp_update_content', 'wp_delete_content' ),
 			'Block editor (Gutenberg)' => array( 'wp_list_block_types', 'wp_get_blocks', 'wp_set_blocks' ),
-			'Elementor'               => array( 'wp_get_elementor', 'wp_set_elementor' ),
-			'Divi'                    => array( 'wp_get_divi', 'wp_set_divi' ),
-			'Media & taxonomy'        => array( 'wp_upload_media', 'wp_list_media', 'wp_list_terms', 'wp_create_term' ),
-			'Settings & cache'        => array( 'wp_get_settings', 'wp_update_settings', 'wp_clear_cache' ),
-			'History'                 => array( 'wp_list_history', 'wp_rollback' ),
-			'Plugins & themes'        => WPMCP_Extensions::tool_names(),
+			'Elementor'                => array( 'wp_get_elementor', 'wp_set_elementor' ),
+			'Divi'                     => array( 'wp_get_divi', 'wp_set_divi' ),
+			'Media & taxonomy'         => array( 'wp_upload_media', 'wp_list_media', 'wp_list_terms', 'wp_create_term' ),
+			'Settings & cache'         => array( 'wp_get_settings', 'wp_update_settings', 'wp_clear_cache' ),
+			'History'                  => array( 'wp_list_history', 'wp_rollback' ),
+			'Plugins & themes'         => WPMCP_Extensions::tool_names(),
 		);
 		$specs = array();
-		foreach ( WPMCP_MCP::tools_spec() as $spec ) { $specs[ $spec['name'] ] = $spec; }
+		$on    = 0;
+		foreach ( WPMCP_MCP::tools_spec() as $spec ) {
+			$specs[ $spec['name'] ] = $spec;
+			list( $enabled ) = $this->tool_status( $spec['name'] );
+			if ( $enabled ) { $on++; }
+		}
 		?>
-		<section class="wpmcp-panel"><div class="wpmcp-panel-head"><h2><?php echo $this->icon( 'tools' ); ?>Tools your AI app can use</h2><p>Every tool this server offers. Plugin and theme tools stay off until you enable them in the Security tab.</p></div>
+		<section class="wpmcp-panel"><div class="wpmcp-panel-head"><h2><?php echo $this->icon( 'tools' ); // phpcs:ignore WordPress.Security.EscapeOutput ?>Tools</h2><p><?php echo (int) $on; ?> of <?php echo (int) count( $specs ); ?> are on. Hover a tool to see what it does. Plugin and theme tools stay off until you turn them on in Security.</p></div>
 		<?php foreach ( $groups as $group => $names ) : ?>
 			<h3 class="wpmcp-group"><?php echo esc_html( $group ); ?></h3>
-			<table class="wpmcp-table"><thead><tr><th>Tool</th><th>What it does</th><th>Access</th><th>Status</th></tr></thead><tbody>
+			<ul class="wpmcp-toollist">
 			<?php foreach ( $names as $name ) :
 				if ( ! isset( $specs[ $name ] ) ) { continue; }
-				$spec    = $specs[ $name ];
-				$parts   = preg_split( '/(?<=[.!?])\s/', (string) $spec['description'], 2 );
-				$sentence = $parts[0];
-				if ( false !== strpos( $name, 'delete' ) ) { $access = $this->badge( 'Deletes', 'danger' ); }
-				elseif ( ! empty( $spec['annotations']['readOnlyHint'] ) ) { $access = $this->badge( 'Read only', 'neutral' ); }
-				else { $access = $this->badge( 'Changes data', 'warn' ); }
-				list( $on, $why ) = $this->tool_status( $name );
+				$spec  = $specs[ $name ];
+				$parts = preg_split( '/(?<=[.!?])\s/', (string) $spec['description'], 2 );
+				if ( false !== strpos( $name, 'delete' ) ) { $access = $this->badge( 'Delete', 'danger' ); }
+				elseif ( ! empty( $spec['annotations']['readOnlyHint'] ) ) { $access = $this->badge( 'Read', 'neutral' ); }
+				else { $access = $this->badge( 'Write', 'warn' ); }
+				list( $enabled, $why ) = $this->tool_status( $name );
 				?>
-				<tr><td><strong><?php echo esc_html( isset( $spec['title'] ) ? $spec['title'] : $name ); ?></strong><code><?php echo esc_html( $name ); ?></code></td><td><?php echo esc_html( $sentence ); ?></td><td><?php echo $access; // phpcs:ignore WordPress.Security.EscapeOutput -- badge() escapes. ?></td><td><?php echo $on ? $this->badge( 'Available', 'ok' ) : $this->badge( 'Off', 'off' ) . '<small class="wpmcp-why">' . esc_html( $why ) . '</small>'; // phpcs:ignore WordPress.Security.EscapeOutput ?></td></tr>
+				<li class="<?php echo $enabled ? '' : 'is-off'; ?>" title="<?php echo esc_attr( $parts[0] ); ?>"><span class="wpmcp-tool-main"><strong><?php echo esc_html( isset( $spec['title'] ) ? $spec['title'] : $name ); ?></strong><code><?php echo esc_html( $name ); ?></code></span><span class="wpmcp-tool-meta"><?php echo $enabled ? '' : '<small class="wpmcp-why">' . esc_html( $why ) . '</small>'; echo $access; // phpcs:ignore WordPress.Security.EscapeOutput -- badge() escapes. ?></span></li>
 			<?php endforeach; ?>
-			</tbody></table>
+			</ul>
 		<?php endforeach; ?>
 		</section>
 		<?php
@@ -459,6 +474,10 @@ class WPMCP_Admin {
 				'users'    => '<circle cx="9" cy="8" r="3.5"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 3 6"/>',
 				'activity' => '<path d="M3 12h4l3-8 4 16 3-8h4"/>',
 				'layers'   => '<path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/>',
+				'eye'      => '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+				'eye-off'  => '<path d="M3 3l18 18"/><path d="M10.6 6.1A9.8 9.8 0 0 1 12 6c6.5 0 10 6 10 6a17 17 0 0 1-3.2 3.9M6.6 7.6A16.6 16.6 0 0 0 2 12s3.5 7 10 7a9.6 9.6 0 0 0 4-.9"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/>',
+				'copy'     => '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/>',
+				'tick'     => '<path d="m5 12 5 5 9-10"/>',
 			);
 		}
 		if ( ! isset( $paths[ $name ] ) ) { return ''; }
@@ -563,12 +582,13 @@ class WPMCP_Admin {
 		?>
 		<div class="wrap wpmcp">
 		<header class="wpmcp-header"><div class="wpmcp-brand"><span class="wpmcp-mark"><?php echo $this->icon( 'bolt', 22 ); // phpcs:ignore WordPress.Security.EscapeOutput ?></span><div><h1>WP MCP <span>v<?php echo esc_html( WPMCP_VERSION ); ?></span></h1><p>Let AI apps manage your WordPress site, with you in control.</p></div></div>
-		<div class="wpmcp-header-side"><?php if ( $new ) : ?><a class="wpmcp-pill wpmcp-pill-warn" href="<?php echo esc_url( $this->tab_url( 'system' ) ); ?>">Update available: <?php echo esc_html( $new ); ?></a><?php endif; ?><span class="wpmcp-pill <?php echo $enabled ? 'wpmcp-pill-ok' : 'wpmcp-pill-warn'; ?>"><?php echo $enabled ? 'Server running' : 'Server paused'; ?></span></div></header>
+		<div class="wpmcp-header-side"><?php if ( $new ) : ?><a class="wpmcp-pill wpmcp-pill-warn" href="<?php echo esc_url( $this->tab_url( 'system' ) ); ?>">Update available: <?php echo esc_html( $new ); ?></a><?php endif; ?></div></header>
 		<nav class="wpmcp-tabs" aria-label="WP MCP sections"><?php foreach ( $this->tabs() as $id => $label ) : ?><a href="<?php echo esc_url( $this->tab_url( $id ) ); ?>"<?php echo $id === $tab ? ' class="is-active" aria-current="page"' : ''; ?>><?php echo $this->icon( $icons[ $id ], 17 ); // phpcs:ignore WordPress.Security.EscapeOutput ?><?php echo esc_html( $label ); ?></a><?php endforeach; ?></nav>
-		<?php if ( is_array( $notice ) ) : ?><div class="notice notice-<?php echo esc_attr( $notice['type'] ); ?>"><p><?php echo esc_html( $notice['text'] ); ?></p></div><?php endif; ?>
-		<?php if ( isset( $_GET['wpmcp_connected'] ) ) : ?><div class="notice notice-success is-dismissible"><p><strong>Claude is connected.</strong> Ask Claude to run <code>wp_ping</code> to try it.</p></div><?php endif; ?>
-		<?php if ( ! is_ssl() ) : ?><div class="notice notice-warning"><p>Configure HTTPS before connecting. OAuth sign-in and extension tools need a secure request.</p></div><?php endif; ?>
-		<?php if ( ! get_option( 'permalink_structure' ) ) : ?><div class="notice notice-warning"><p>Enable pretty permalinks: the REST API address does not work with Plain permalinks.</p></div><?php endif; ?>
+		<?php echo $this->update_notice_markup(); // phpcs:ignore WordPress.Security.EscapeOutput -- escaped inside. ?>
+		<?php if ( is_array( $notice ) ) : ?><div class="notice inline wpmcp-notice notice-<?php echo esc_attr( $notice['type'] ); ?>"><p><?php echo esc_html( $notice['text'] ); ?></p></div><?php endif; ?>
+		<?php if ( isset( $_GET['wpmcp_connected'] ) ) : ?><div class="notice inline wpmcp-notice notice-success"><p><strong>Claude is connected.</strong> Ask Claude to run <code>wp_ping</code> to try it.</p></div><?php endif; ?>
+		<?php if ( ! is_ssl() ) : ?><div class="notice inline wpmcp-notice notice-warning"><p>Configure HTTPS before connecting. OAuth sign-in and extension tools need a secure request.</p></div><?php endif; ?>
+		<?php if ( ! get_option( 'permalink_structure' ) ) : ?><div class="notice inline wpmcp-notice notice-warning"><p>Enable pretty permalinks: the REST API address does not work with Plain permalinks.</p></div><?php endif; ?>
 		<?php if ( 'connect' === $tab ) { $this->render_whatsnew(); } ?>
 		<div class="wpmcp-grid"><main class="wpmcp-main">
 		<?php
@@ -579,7 +599,7 @@ class WPMCP_Admin {
 		else { $this->render_stats( $enabled ); $this->render_connect( $url ); $this->render_connected(); }
 		?>
 		</main><aside class="wpmcp-side" aria-label="Updates and help"><?php $this->render_sidebar( $enabled ); ?></aside></div>
-		<footer class="wpmcp-footer">WP MCP · By Saifullah Qadeer</footer><p id="wpmcp-feedback" class="screen-reader-text" role="status" aria-live="polite"></p></div>
+		<p id="wpmcp-feedback" class="screen-reader-text" role="status" aria-live="polite"></p></div>
 		<?php
 	}
 }

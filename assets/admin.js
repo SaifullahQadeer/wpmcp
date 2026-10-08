@@ -3,9 +3,14 @@ async function wpmcpCopy(id, button, label) {
   const feedback = document.getElementById('wpmcp-feedback');
   try {
     await navigator.clipboard.writeText(input.value);
-    button.textContent = 'Copied';
     feedback.textContent = 'Copied to clipboard.';
-    setTimeout(() => { button.textContent = label; }, 1800);
+    if (button.classList.contains('wpmcp-icon-btn')) {
+      button.classList.add('is-done');
+      setTimeout(() => { button.classList.remove('is-done'); }, 1800);
+    } else {
+      button.textContent = 'Copied';
+      setTimeout(() => { button.textContent = label; }, 1800);
+    }
   } catch (_) {
     input.type = 'text';
     input.focus();
@@ -33,8 +38,9 @@ document.addEventListener('click', async (event) => {
     const input = document.getElementById(button.dataset.reveal);
     const show = input.type === 'password';
     input.type = show ? 'text' : 'password';
-    button.textContent = show ? 'Hide' : 'Show';
     button.setAttribute('aria-pressed', String(show));
+    button.setAttribute('aria-label', show ? 'Hide' : 'Show');
+    button.title = show ? 'Hide' : 'Show';
   }
   if (button.dataset.copy) {
     await wpmcpCopy(button.dataset.copy, button, 'Copy');
