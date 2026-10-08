@@ -54,7 +54,7 @@ class WPMCP_Admin {
 	/* ----------------------------------------------------------------- */
 
 	private function tabs() {
-		return array( 'connect' => 'Connect', 'tools' => 'Tools', 'security' => 'Security', 'system' => 'System' );
+		return array( 'connect' => 'Connect', 'tools' => 'Tools', 'history' => 'History', 'security' => 'Security', 'system' => 'System' );
 	}
 	private function tab_url( $tab ) {
 		return add_query_arg( array( 'page' => 'wp-mcp', 'tab' => $tab ), admin_url( 'admin.php' ) );
@@ -89,8 +89,26 @@ class WPMCP_Admin {
 		} elseif ( 'revoke' === $action ) {
 			$grant   = isset( $_POST['wpmcp_grant'] ) ? sanitize_key( wp_unslash( $_POST['wpmcp_grant'] ) ) : '';
 			$message = WPMCP_OAuth::revoke_grant( $grant ) ? 'App disconnected. Its access stopped immediately.' : 'That connection was already removed.';
+		} elseif ( 'rollback' === $action ) {
+			$id     = isset( $_POST['wpmcp_entry'] ) ? absint( wp_unslash( $_POST['wpmcp_entry'] ) ) : 0;
+			$result = WPMCP_History::rollback( $id, ! empty( $_POST['wpmcp_force'] ), true );
+			$extra  = array();
+			if ( is_wp_error( $result ) ) {
+				$type    = 'error';
+				$message = $result->get_error_message();
+				if ( 'wpmcp_changed_since' === $result->get_error_code() ) { $extra['wpmcp_force'] = $id; $type = 'warning'; }
+			} else {
+				$type    = 'success';
+				$message = $result['message'];
+			}
+			set_transient( 'wpmcp_notice_' . get_current_user_id(), array( 'text' => $message, 'type' => $type ), 60 );
+			wp_safe_redirect( add_query_arg( $extra, $this->tab_url( $tab ) ) );
+			exit;
+		} elseif ( 'clear_history' === $action ) {
+			WPMCP_History::clear();
+			$message = 'History cleared. Saved file snapshots are kept.';
 		} else { return; }
-		set_transient( 'wpmcp_notice_' . get_current_user_id(), $message, 60 );
+		set_transient( 'wpmcp_notice_' . get_current_user_id(), array( 'text' => $message, 'type' => 'success' ), 60 );
 		wp_safe_redirect( $this->tab_url( $tab ) );
 		exit;
 	}
@@ -245,6 +263,7 @@ class WPMCP_Admin {
 			'Site & content'   => array( 'wp_ping', 'wp_list_post_types', 'wp_list_content', 'wp_get_content', 'wp_create_content', 'wp_update_content', 'wp_delete_content' ),
 			'Elementor'        => array( 'wp_get_elementor', 'wp_set_elementor' ),
 			'Media & taxonomy' => array( 'wp_upload_media', 'wp_list_media', 'wp_list_terms', 'wp_create_term' ),
+			'History'          => array( 'wp_list_history', 'wp_rollback' ),
 			'Plugins & themes' => WPMCP_Extensions::tool_names(),
 		);
 		$specs = array();
@@ -268,6 +287,50 @@ class WPMCP_Admin {
 			<?php endforeach; ?>
 			</tbody></table>
 		<?php endforeach; ?>
+		</section>
+		<?php
+	}
+
+	/* ----------------------------------------------------------------- */
+	/* History tab                                                       */
+	/* ----------------------------------------------------------------- */
+
+	private function render_history() {
+		$per_page = 25;
+		$total    = WPMCP_History::count();
+		$pages    = max( 1, (int) ceil( $total / $per_page ) );
+		$page     = isset( $_GET['paged'] ) ? min( $pages, max( 1, absint( wp_unslash( $_GET['paged'] ) ) ) ) : 1;
+		$entries  = WPMCP_History::entries( $page, $per_page );
+		$force    = isset( $_GET['wpmcp_force'] ) ? absint( wp_unslash( $_GET['wpmcp_force'] ) ) : 0;
+		?>
+		<section class="wpmcp-panel"><div class="wpmcp-panel-head"><h2>Change history</h2><p>Every change an AI app makes through WP MCP is recorded here, with what it touched. Roll back restores only that part and leaves other edits alone. The latest <?php echo (int) WPMCP_History::KEEP_ROWS; ?> changes are kept for <?php echo (int) WPMCP_History::KEEP_DAYS; ?> days.</p></div>
+		<?php if ( ! $entries ) : ?><p class="wpmcp-empty">No changes recorded yet. Changes made by connected apps will appear here.</p><?php else : ?>
+		<table class="wpmcp-table"><thead><tr><th>When</th><th>Who</th><th>Change</th><th>Status</th><th></th></tr></thead><tbody>
+		<?php foreach ( $entries as $row ) :
+			$time  = strtotime( $row['created_at'] . ' UTC' );
+			$id    = (int) $row['id'];
+			$link  = in_array( $row['object_type'], array( 'post', 'attachment' ), true ) && get_post( (int) $row['object_id'] ) ? get_edit_post_link( (int) $row['object_id'], 'raw' ) : '';
+			$label = '' !== (string) $row['label'] ? $row['label'] : '(untitled)';
+			?>
+			<tr>
+				<td title="<?php echo esc_attr( wp_date( 'Y-m-d H:i', $time ) ); ?>"><?php echo esc_html( human_time_diff( $time ) . ' ago' ); ?></td>
+				<td><?php echo esc_html( $row['actor'] ); ?></td>
+				<td><strong><?php echo esc_html( $row['summary'] ); ?></strong><br /><?php echo $link ? '<a href="' . esc_url( $link ) . '">' . esc_html( $label ) . '</a>' : esc_html( $label ); // phpcs:ignore WordPress.Security.EscapeOutput -- both branches escape. ?></td>
+				<td><?php
+				if ( 'rolled_back' === $row['status'] ) { echo $this->badge( 'Rolled back', 'neutral' ) . '<small class="wpmcp-why">' . esc_html( 'by ' . $row['rolled_back_by'] ) . '</small>'; } // phpcs:ignore WordPress.Security.EscapeOutput
+				elseif ( $row['can_rollback'] ) { echo $this->badge( 'Applied', 'ok' ); } // phpcs:ignore WordPress.Security.EscapeOutput
+				else { echo $this->badge( 'Cannot roll back', 'off' ); } // phpcs:ignore WordPress.Security.EscapeOutput
+				?></td>
+				<td class="wpmcp-right"><?php if ( 'applied' === $row['status'] && $row['can_rollback'] ) : ?>
+					<form method="post"><?php $this->form_fields( 'rollback', 'history' ); ?><input type="hidden" name="wpmcp_entry" value="<?php echo esc_attr( $id ); ?>" />
+					<?php if ( $force === $id ) : ?><input type="hidden" name="wpmcp_force" value="1" /><button class="button button-primary" data-confirm="This item was edited after the change. Rolling back overwrites those edits. Continue?">Roll back anyway</button>
+					<?php else : ?><button class="button" data-confirm="Roll back this change?">Roll back</button><?php endif; ?></form>
+				<?php endif; ?></td>
+			</tr>
+		<?php endforeach; ?></tbody></table>
+		<?php if ( $pages > 1 ) : ?><div class="wpmcp-pages"><?php echo wp_kses_post( paginate_links( array( 'base' => add_query_arg( 'paged', '%#%', $this->tab_url( 'history' ) ), 'format' => '', 'current' => $page, 'total' => $pages, 'prev_text' => '‹ Newer', 'next_text' => 'Older ›' ) ) ); ?></div><?php endif; ?>
+		<form method="post" class="wpmcp-rotate"><?php $this->form_fields( 'clear_history', 'history' ); ?><button class="button" data-confirm="Clear the whole history? You will no longer be able to roll these changes back.">Clear history</button></form>
+		<?php endif; ?>
 		</section>
 		<?php
 	}
@@ -375,12 +438,13 @@ class WPMCP_Admin {
 		<header class="wpmcp-header"><div><h1>WP MCP <span>v<?php echo esc_html( WPMCP_VERSION ); ?></span></h1><p>Let AI apps manage your WordPress site, with you in control.</p></div>
 		<div class="wpmcp-header-side"><?php if ( $new ) : ?><a class="wpmcp-pill wpmcp-pill-warn" href="<?php echo esc_url( $this->tab_url( 'system' ) ); ?>">Update available: <?php echo esc_html( $new ); ?></a><?php endif; ?><span class="wpmcp-pill <?php echo $enabled ? 'wpmcp-pill-ok' : 'wpmcp-pill-warn'; ?>"><?php echo $enabled ? 'Server running' : 'Server paused'; ?></span></div></header>
 		<nav class="wpmcp-tabs" aria-label="WP MCP sections"><?php foreach ( $this->tabs() as $id => $label ) : ?><a href="<?php echo esc_url( $this->tab_url( $id ) ); ?>"<?php echo $id === $tab ? ' class="is-active" aria-current="page"' : ''; ?>><?php echo esc_html( $label ); ?></a><?php endforeach; ?></nav>
-		<?php if ( $notice ) : ?><div class="notice notice-success"><p><?php echo esc_html( $notice ); ?></p></div><?php endif; ?>
+		<?php if ( is_array( $notice ) ) : ?><div class="notice notice-<?php echo esc_attr( $notice['type'] ); ?>"><p><?php echo esc_html( $notice['text'] ); ?></p></div><?php endif; ?>
 		<?php if ( isset( $_GET['wpmcp_connected'] ) ) : ?><div class="notice notice-success is-dismissible"><p><strong>Claude is connected.</strong> Ask Claude to run <code>wp_ping</code> to try it.</p></div><?php endif; ?>
 		<?php if ( ! is_ssl() ) : ?><div class="notice notice-warning"><p>Configure HTTPS before connecting. OAuth sign-in and extension tools need a secure request.</p></div><?php endif; ?>
 		<?php if ( ! get_option( 'permalink_structure' ) ) : ?><div class="notice notice-warning"><p>Enable pretty permalinks: the REST API address does not work with Plain permalinks.</p></div><?php endif; ?>
 		<?php
 		if ( 'tools' === $tab ) { $this->render_tools(); }
+		elseif ( 'history' === $tab ) { $this->render_history(); }
 		elseif ( 'security' === $tab ) { $this->render_security( $key ); }
 		elseif ( 'system' === $tab ) { $this->render_system( $url ); }
 		else { $this->render_stats( $enabled ); $this->render_connect( $url ); $this->render_connected(); }

@@ -336,6 +336,8 @@ class WPMCP_MCP {
 		return "This server controls one WordPress site.\n"
 			. "Before editing code: read the existing file, preserve literal PHP tags (never HTML-encode source), run wp_edit_extension_file with dry_run=true, then apply one change at a time using the current hash. Save the returned backup_id, run wp_ping, and check the affected page. Backups can be listed and restored while WordPress still works. Stop issuing edits if responses become malformed; bootstrap failures require hosting backup, SFTP, or file-manager recovery. Never claim this connector can repair every outage.\n"
 			. "Call wp_ping first: it reports the Elementor version and editor generation (v3 classic vs v4 atomic), which decides the JSON shape wp_set_elementor expects.\n"
+			. "Every change you make is recorded. If the user asks to undo something, call wp_list_history to find it and wp_rollback to reverse it; if wp_rollback reports the item was edited since, tell the user before using force.
+"
 			. "Elementor layouts can be very large. Read them with wp_get_elementor using summary=true first, then fetch one section at a time with index=N. Write them back section by section using the __append__ or __replace__ markers rather than resending the whole tree.";
 	}
 
@@ -511,6 +513,17 @@ class WPMCP_MCP {
 				$body = $args;
 				unset( $body['taxonomy'] );
 				return WPMCP_Core::create_term( $args['taxonomy'], $body );
+
+			case 'wp_list_history':
+				$per_page = isset( $args['per_page'] ) ? max( 1, min( 50, (int) $args['per_page'] ) ) : 20;
+				$page     = isset( $args['page'] ) ? max( 1, (int) $args['page'] ) : 1;
+				return WPMCP_History::listing( $page, $per_page );
+
+			case 'wp_rollback':
+				if ( ! isset( $args['id'] ) ) {
+					return new WP_Error( 'wpmcp_missing_arg', 'Missing "id".' );
+				}
+				return WPMCP_History::rollback( (int) $args['id'], ! empty( $args['force'] ), false );
 
 			default:
 				return new WP_Error( 'wpmcp_unknown_tool', 'Unknown tool: ' . $name );
@@ -731,6 +744,26 @@ class WPMCP_MCP {
 					'parent'   => array( 'type' => 'integer', 'description' => 'Optional parent term id.' ),
 				), array( 'taxonomy', 'name' ) ),
 				'annotations' => self::ann( 'Create a taxonomy term', false, false, false ),
+			),
+			array(
+				'name'        => 'wp_list_history',
+				'title'       => 'List change history',
+				'description' => 'List recent changes made through WP MCP, newest first, with the id to pass to wp_rollback. Shows what changed, who changed it, and whether it can still be rolled back.',
+				'inputSchema' => self::obj( array(
+					'per_page' => array( 'type' => 'integer', 'description' => 'Entries per page (1-50, default 20).' ),
+					'page'     => array( 'type' => 'integer', 'description' => 'Page number.' ),
+				) ),
+				'annotations' => self::ann( 'List change history', true, false, true ),
+			),
+			array(
+				'name'        => 'wp_rollback',
+				'title'       => 'Roll back a change',
+				'description' => 'Undo one change from wp_list_history: restores the previous content, Elementor layout, terms and meta, trashes something that was created, or restores something that was deleted. If the item was edited after the change, this refuses unless force is true, so tell the user first. File edits are rolled back with wp_restore_extension_file.',
+				'inputSchema' => self::obj( array(
+					'id'    => array( 'type' => 'integer', 'description' => 'History entry id from wp_list_history.' ),
+					'force' => array( 'type' => 'boolean', 'description' => 'Roll back even though the item was edited after the change. Only after the user agrees to overwrite those edits.' ),
+				), array( 'id' ) ),
+				'annotations' => self::ann( 'Roll back a change', false, true, false ),
 			),
 		);
 	}

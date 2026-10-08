@@ -80,3 +80,4 @@
 .wpmcp-footer{color:#787c82;padding:18px 0 30px;font-size:12px}
 @media(max-width:900px){.wpmcp-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.wpmcp-table{display:block;overflow-x:auto}}
 @media(max-width:600px){.wpmcp{margin:16px 10px}.wpmcp-header{flex-direction:column}.wpmcp-header-side{justify-content:flex-start}.wpmcp-panel{padding:18px}.wpmcp-copy{flex-wrap:wrap}.wpmcp-copy input{flex-basis:100%}.wpmcp-save{flex-direction:column;align-items:flex-start}.wpmcp-kv th{width:110px}}
+.wpmcp-pages{margin:16px 0 0;display:flex;gap:6px;flex-wrap:wrap}.wpmcp-pages .page-numbers{padding:5px 11px;border:1px solid var(--wpmcp-line);border-radius:6px;text-decoration:none;background:#fff}.wpmcp-pages .current{background:var(--wpmcp-brand);border-color:var(--wpmcp-brand);color:#fff}.notice-error.notice{border-left-color:#d63638}

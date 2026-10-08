@@ -51,7 +51,17 @@ class WPMCP_Extensions {
 		} finally { wp_set_current_user( $previous ); }
 	}
 
-	private static function execute( $name, $kind, $args ) {
+	/** Roll back a file edit from the admin screen: same checks as the tool, run as the signed-in administrator. */
+	public static function admin_restore( $kind, $id, $file, $backup_id ) {
+		if ( ! in_array( $kind, array( 'plugin', 'theme' ), true ) || ! current_user_can( 'edit_' . $kind . 's' ) ) { return new WP_Error( 'wpmcp_capability', 'You do not have permission to edit ' . $kind . ' files.' ); }
+		if ( is_multisite() ) { return new WP_Error( 'wpmcp_extensions_disabled', 'Multisite is not supported.' ); }
+		require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		require_once ABSPATH . 'wp-admin/includes/file.php';
+		$result = self::execute( 'wp_restore_extension_file', $kind, array( 'kind' => $kind, 'extension' => $id, 'file' => $file, 'backup_id' => $backup_id ), true );
+		return is_wp_error( $result ) ? $result : true;
+	}
+
+	private static function execute( $name, $kind, $args, $trusted = false ) {
 		if ( 'wp_list_extensions' === $name ) {
 			$out = array();
 			if ( 'plugin' === $kind ) {
@@ -111,6 +121,7 @@ class WPMCP_Extensions {
 			if ( ! isset( $items[$backup_id] ) ) { return new WP_Error( 'wpmcp_backup_missing', 'Snapshot not found for this exact file.' ); }
 			$args['content'] = $items[$backup_id]['content'];
 		}
+		if ( $trusted ) { $args['expected_sha256'] = $hash; } // The administrator is acting directly, so there is no stale read to guard against.
 		if ( ! isset( $args['content'], $args['expected_sha256'] ) || ! is_string( $args['content'] ) || ! is_string( $args['expected_sha256'] ) || strlen( $args['content'] ) > 100000 || ! hash_equals( $hash, $args['expected_sha256'] ) ) { return new WP_Error( 'wpmcp_conflict', 'Read the current file again and supply its SHA-256. Content must be a string no larger than 100 KB.' ); }
 		if ( ! wp_is_file_mod_allowed( 'wpmcp_edit' ) || ( defined( 'DISALLOW_FILE_EDIT' ) && DISALLOW_FILE_EDIT ) ) { return new WP_Error( 'wpmcp_file_mods', 'WordPress file editing is disabled.' ); }
 		$validation = WPMCP_File_Safety::validate( $file, $args['content'], $content );
@@ -120,6 +131,9 @@ class WPMCP_Extensions {
 		if ( is_wp_error( $backup ) ) { return $backup; }
 		$edit = array( 'file' => $file, $kind => $id, 'newcontent' => $args['content'], 'nonce' => wp_create_nonce( 'plugin' === $kind ? 'edit-plugin_' . $file : 'edit-theme_' . $id . '_' . $file ) );
 		$result = wp_edit_theme_plugin_file( $edit );
+		if ( ! is_wp_error( $result ) ) {
+			WPMCP_History::record( $name, 'file', 0, $kind . ' ' . $id . ': ' . $file, ( 'wp_restore_extension_file' === $name ? 'Restored ' : 'Edited ' ) . $file, array( 'op' => 'file', 'kind' => $kind, 'extension' => $id, 'file' => $file, 'backup_id' => $backup ) );
+		}
 		return is_wp_error( $result ) ? $result : array( 'updated' => true, 'file' => $file, 'sha256' => hash( 'sha256', $args['content'] ), 'backup_id' => $backup, 'next_step' => 'Run wp_ping and check the changed page. If behavior is wrong, read the current file hash and restore this backup.' );
 	}
 }

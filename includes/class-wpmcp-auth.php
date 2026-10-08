@@ -18,6 +18,9 @@ class WPMCP_Auth {
 
 	public static $header_authenticated = false;
 
+	/** Who is making the current request, for the change history: the app's name or "API key". */
+	public static $actor = '';
+
 	/**
 	 * Generate a random, URL-safe API key.
 	 *
@@ -69,6 +72,7 @@ class WPMCP_Auth {
 	 */
 	public static function check( $request ) {
 		self::$header_authenticated = false;
+		self::$actor                = '';
 		if ( '1' !== (string) get_option( 'wpmcp_enabled', '1' ) ) {
 			return new WP_Error(
 				'wpmcp_disabled',
@@ -87,6 +91,7 @@ class WPMCP_Auth {
 				return new WP_Error( 'wpmcp_invalid_token', 'The access token is invalid or has expired.', array( 'status' => 401 ) );
 			}
 			wp_set_current_user( $grant['user_id'] );
+			self::$actor                = $grant['name'];
 			self::$header_authenticated = true;
 			return true;
 		}
@@ -141,6 +146,7 @@ class WPMCP_Auth {
 		}
 
 		delete_transient( $fail_key );
+		self::$actor                = 'API key';
 		self::$header_authenticated = $from_header;
 		return true;
 	}

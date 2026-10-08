@@ -81,7 +81,7 @@ class WPMCP_Core {
 			if ( ! is_string( $key ) || '' === $key ) {
 				continue;
 			}
-			update_post_meta( $post_id, $key, $value );
+			update_post_meta( $post_id, $key, wp_slash( $value ) );
 		}
 	}
 
@@ -232,11 +232,12 @@ class WPMCP_Core {
 			$postarr['menu_order'] = (int) $body['menu_order'];
 		}
 
-		$post_id = wp_insert_post( $postarr, true );
+		$post_id = wp_insert_post( wp_slash( $postarr ), true ); // Expects slashed data; without this backslashes in content are lost.
 		if ( is_wp_error( $post_id ) ) {
 			return $post_id;
 		}
 		self::apply_post_extras( $post_id, $body );
+		WPMCP_History::record( 'wp_create_content', 'post', $post_id, $postarr['post_title'], sprintf( 'Created %s', $type ), array( 'op' => 'trash_created' ) );
 
 		return array(
 			'ok'   => true,
@@ -274,11 +275,14 @@ class WPMCP_Core {
 			$postarr['menu_order'] = (int) $body['menu_order'];
 		}
 
-		$result = wp_update_post( $postarr, true );
+		$history = WPMCP_History::begin_state( (int) $id, WPMCP_History::scope_for_update( $body ) );
+		$result  = wp_update_post( wp_slash( $postarr ), true ); // Expects slashed data; without this backslashes in content are lost.
 		if ( is_wp_error( $result ) ) {
 			return $result;
 		}
 		self::apply_post_extras( (int) $id, $body );
+		$changed = array_values( array_intersect( array_keys( $body ), array( 'title', 'content', 'excerpt', 'status', 'slug', 'parent', 'menu_order', 'featured_media', 'meta', 'terms', 'elementor' ) ) );
+		WPMCP_History::finish_state( $history, 'wp_update_content', sprintf( 'Updated %s (%s)', $type, implode( ', ', $changed ) ) );
 
 		return array(
 			'ok'   => true,
@@ -291,10 +295,13 @@ class WPMCP_Core {
 		if ( ! $post || $post->post_type !== $type ) {
 			return new WP_Error( 'wpmcp_not_found', 'Item not found for that type/id.', array( 'status' => 404 ) );
 		}
-		$result = wp_delete_post( (int) $id, (bool) $force );
+		$snapshot = WPMCP_History::full_snapshot( (int) $id );
+		$result   = wp_delete_post( (int) $id, (bool) $force );
 		if ( ! $result ) {
 			return new WP_Error( 'wpmcp_delete_failed', 'Could not delete the item.', array( 'status' => 500 ) );
 		}
+		$trashed = (bool) get_post( (int) $id ); // Still there means it went to the trash and can simply be restored.
+		WPMCP_History::record( 'wp_delete_content', 'post', (int) $id, $post->post_title, $trashed ? sprintf( 'Moved %s to the trash', $type ) : sprintf( 'Deleted %s permanently', $type ), $trashed ? array( 'op' => 'untrash' ) : $snapshot );
 		return array(
 			'ok'      => true,
 			'deleted' => (int) $id,
@@ -410,7 +417,8 @@ class WPMCP_Core {
 			return new WP_Error( 'wpmcp_not_found', 'Post not found.', array( 'status' => 404 ) );
 		}
 
-		$mode = 'replace-all';
+		$mode    = 'replace-all';
+		$history = WPMCP_History::begin_state( (int) $id, WPMCP_History::scope_for_elementor() );
 
 		if ( null !== $elements ) {
 			$marker = ( is_array( $elements ) && isset( $elements[0] ) && is_array( $elements[0] ) && isset( $elements[0]['elType'] ) )
@@ -468,6 +476,7 @@ class WPMCP_Core {
 			WPMCP_Elementor::clear_cache( (int) $id );
 		}
 
+		WPMCP_History::finish_state( $history, 'wp_set_elementor', null === $elements ? 'Changed Elementor page settings' : sprintf( 'Changed the Elementor layout (%s)', $mode ) );
 		$data = WPMCP_Elementor::get_data( (int) $id );
 		return array(
 			'ok'                    => true,
@@ -565,6 +574,7 @@ class WPMCP_Core {
 		if ( isset( $body['alt'] ) ) {
 			update_post_meta( $attachment_id, '_wp_attachment_image_alt', sanitize_text_field( $body['alt'] ) );
 		}
+		WPMCP_History::record( 'wp_upload_media', 'attachment', $attachment_id, get_the_title( $attachment_id ), 'Uploaded ' . $file_array['name'], array( 'op' => 'delete_attachment' ) );
 
 		return array(
 			'ok'        => true,
@@ -620,6 +630,7 @@ class WPMCP_Core {
 		if ( is_wp_error( $result ) ) {
 			return $result;
 		}
+		WPMCP_History::record( 'wp_create_term', 'term', (int) $result['term_id'], $name, sprintf( 'Created %s term', $taxonomy ), array( 'op' => 'delete_term', 'taxonomy' => $taxonomy, 'term_id' => (int) $result['term_id'] ) );
 		return array(
 			'ok'   => true,
 			'id'   => $result['term_id'],

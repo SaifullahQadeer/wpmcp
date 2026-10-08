@@ -423,7 +423,7 @@ class WPMCP_OAuth {
 			$grants[ $data['grant'] ]['last_used'] = time();
 			self::save_grants( $grants );
 		}
-		return array( 'user_id' => (int) $user->ID, 'grant' => $data['grant'] );
+		return array( 'user_id' => (int) $user->ID, 'grant' => $data['grant'], 'name' => (string) $grants[ $data['grant'] ]['client_name'] );
 	}
 
 	public static function revoke_token( $token ) {

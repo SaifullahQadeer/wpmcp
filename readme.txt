@@ -3,7 +3,7 @@ Author: Saifullah Qadeer
 Requires at least: 5.6
 Requires PHP: 7.4
 Tested with Elementor: 4.x
-Stable tag: 2.7.0
+Stable tag: 2.8.0
 License: GPL-2.0-or-later
 
 Turns a WordPress site into its own remote MCP server, so Claude (web, Desktop,
@@ -40,14 +40,26 @@ keys are not accepted.
 Requirements: the site must be on HTTPS, and permalinks must not be set to
 "Plain" (otherwise /wp-json/ 404s).
 
-== Tools (20) ==
+== Tools (22) ==
 
 wp_ping, wp_list_post_types, wp_list_content, wp_get_content, wp_create_content,
 wp_update_content, wp_delete_content, wp_get_elementor, wp_set_elementor,
 wp_upload_media, wp_list_media, wp_list_terms, wp_create_term,
 wp_list_extensions, wp_install_extension, wp_list_extension_files,
 wp_read_extension_file, wp_edit_extension_file, wp_list_file_backups,
-wp_restore_extension_file.
+wp_restore_extension_file, wp_list_history, wp_rollback.
+
+== Change history and rollback ==
+
+Every write made through WP MCP is recorded (the connected app or API key, what
+changed, when) in the History tab, with what is needed to undo it: content and
+meta fields, terms, featured image and Elementor layout are restored from a
+snapshot of only what the call touched; created items are trashed; deleted items
+are restored (permanent deletes come back with the same ID); uploads and terms
+are removed; file edits restore their pre-edit snapshot. If an item was edited
+after the change, rollback asks for confirmation before overwriting those edits.
+The latest 300 changes are kept for 90 days. AI apps can use wp_list_history
+and wp_rollback. Plugin and theme installs are recorded but cannot be undone.
 
 == File safety and recovery (2.3.0) ==
 
@@ -126,6 +138,10 @@ wp_set_elementor also accepts "page_settings" for _elementor_page_settings, on
 its own or alongside elements.
 
 == Changelog ==
+
+= 2.8.0 =
+* History tab and rollback: every change made through WP MCP is recorded and can be undone from the admin screen, or by an app with wp_list_history and wp_rollback.
+* Fixed: backslashes in post content and custom fields were removed when saving through WP MCP. They are now kept.
 
 = 2.7.0 =
 * Redesigned admin screen with four tabs: Connect (status tiles, connect an app, connected apps), Tools (all 20 tools with access level and whether each is on), Security (access switches, API key, built-in protection) and System (version and update check, site details, endpoints, file safety and recovery).
