@@ -43,6 +43,10 @@ require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-admin.php';
 function wpmcp_activate() {
 	if ( ! get_option( 'wpmcp_api_key' ) ) {
 		update_option( 'wpmcp_api_key', WPMCP_Auth::generate_key() );
+		// Fresh installs: keys in URLs end up in access logs, so opt in explicitly.
+		if ( false === get_option( 'wpmcp_allow_url_key', false ) ) {
+			update_option( 'wpmcp_allow_url_key', '0' );
+		}
 	}
 	// Default: allow all registered public post types unless the admin narrows it.
 	if ( false === get_option( 'wpmcp_enabled', false ) ) {

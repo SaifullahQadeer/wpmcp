@@ -32,7 +32,9 @@ requires a header; it does not allow anonymous access.
 
 Compatibility -- key in the URL (content tools only):
     https://SITE/wp-json/wpmcp/v1/mcp/YOUR_API_KEY
-Requires Allow API keys in URLs in settings. Query-string keys are not accepted.
+Requires Allow API keys in URLs in settings, which is off on new installs
+(sites that already had the plugin keep their current setting). Query-string
+keys are not accepted.
 
 Requirements: the site must be on HTTPS, and permalinks must not be set to
 "Plain" (otherwise /wp-json/ 404s).
