@@ -32,7 +32,7 @@ class WPMCP_Core {
 			'date'           => $post->post_date_gmt,
 			'modified'       => $post->post_modified_gmt,
 			'featured_media' => (int) get_post_thumbnail_id( $post->ID ),
-			'builder'        => WPMCP_Builders::builder_for( $post->ID ),
+			'builder'        => self::builder_of( $post->ID ),
 		);
 
 		if ( $include_body ) {
@@ -57,6 +57,16 @@ class WPMCP_Core {
 		}
 
 		return $data;
+	}
+
+	/** elementor, gutenberg or classic. The Pro add-on also recognises Divi through the "wpmcp_builder_for" filter. */
+	public static function builder_of( $post_id ) {
+		$builder = 'builder' === get_post_meta( $post_id, '_elementor_edit_mode', true ) ? 'elementor' : null;
+		if ( ! $builder ) {
+			$post    = get_post( $post_id );
+			$builder = $post && function_exists( 'has_blocks' ) && has_blocks( $post->post_content ) ? 'gutenberg' : 'classic';
+		}
+		return apply_filters( 'wpmcp_builder_for', $builder, $post_id );
 	}
 
 	public static function get_public_meta( $post_id ) {
@@ -86,7 +96,41 @@ class WPMCP_Core {
 		}
 	}
 
-	/** Saves featured image, meta, terms, Elementor data and ACF values. Returns the ACF outcome, or null when none was sent. */
+	/** Taxonomies Free may use. The Pro add-on lifts the limit (returns null). */
+	public static function allowed_taxonomies() {
+		$allowed = apply_filters( 'wpmcp_allowed_taxonomies', array( 'category', 'post_tag' ) );
+		return is_array( $allowed ) ? $allowed : null;
+	}
+
+	/** Post types Free may use. The Pro add-on lifts the limit (returns null). */
+	public static function allowed_types() {
+		$allowed = apply_filters( 'wpmcp_allowed_post_types', array( 'post', 'page' ) );
+		return is_array( $allowed ) ? $allowed : null;
+	}
+
+	/**
+	 * Refuse, before anything is saved, extras the site's plan does not include: a full Elementor tree
+	 * (Plus), ACF values (Pro), and taxonomies other than categories and tags (Pro).
+	 */
+	private static function check_extras( $body ) {
+		if ( isset( $body['elementor'] ) && ! WPMCP_Plans::allows( 'wp_set_elementor' ) ) {
+			return new WP_Error( 'wpmcp_plan', WPMCP_Plans::upgrade_text( 'plus', 'Writing an Elementor layout' ) . ' To change words on an Elementor page use wp_edit_elementor_text.', array( 'status' => 403 ) );
+		}
+		if ( isset( $body['acf'] ) && ! WPMCP_Plans::allows( 'wp_acf_set_values' ) ) {
+			return new WP_Error( 'wpmcp_plan', WPMCP_Plans::upgrade_text( 'pro', 'Saving ACF field values' ), array( 'status' => 403 ) );
+		}
+		$taxonomies = self::allowed_taxonomies();
+		if ( null !== $taxonomies && isset( $body['terms'] ) && is_array( $body['terms'] ) ) {
+			foreach ( array_keys( $body['terms'] ) as $taxonomy ) {
+				if ( ! in_array( $taxonomy, $taxonomies, true ) ) {
+					return new WP_Error( 'wpmcp_plan', WPMCP_Plans::upgrade_text( 'pro', sprintf( 'Using the "%s" taxonomy', (string) $taxonomy ) ) . ' Free covers ' . implode( ' and ', $taxonomies ) . '.', array( 'status' => 403 ) );
+				}
+			}
+		}
+		return null;
+	}
+
+	/** Saves featured image, meta, terms and the Elementor tree, then lets the Pro add-on save its extras (ACF). Returns their results by name. */
 	private static function apply_post_extras( $post_id, $body ) {
 		if ( isset( $body['featured_media'] ) ) {
 			set_post_thumbnail( $post_id, (int) $body['featured_media'] );
@@ -108,25 +152,21 @@ class WPMCP_Core {
 			}
 			WPMCP_Elementor::set_data( $post_id, $elements );
 		}
-		$acf = null;
-		if ( isset( $body['acf'] ) && is_array( $body['acf'] ) ) {
-			$acf = WPMCP_ACF::set_values( $post_id, $body['acf'] );
-		}
-		return $acf;
+		return (array) apply_filters( 'wpmcp_post_extras', array(), $post_id, $body );
 	}
 
-	/** Add the ACF outcome to a content result: what was set, or why it was not. */
-	private static function with_acf( $result, $acf ) {
-		if ( null !== $acf ) {
-			$result['acf'] = is_wp_error( $acf ) ? array( 'ok' => false, 'error' => $acf->get_error_message() ) : $acf;
+	/** Add the extras' outcomes to a content result: what was set, or why it was not. */
+	private static function with_extras( $result, $extras ) {
+		foreach ( (array) $extras as $name => $outcome ) {
+			$result[ $name ] = is_wp_error( $outcome ) ? array( 'ok' => false, 'error' => $outcome->get_error_message() ) : $outcome;
 		}
 		return $result;
 	}
 
-	/** WooCommerce owns products, orders and coupons: changing them as plain posts would skip its stock, price and order rules. */
+	/** Post types another plugin manages itself (WooCommerce products and orders): changing them as plain posts would skip its rules. */
 	private static function owned_error( $type ) {
-		if ( ! WPMCP_Woo::owns_type( $type ) ) { return null; }
-		return new WP_Error( 'wpmcp_use_woo', sprintf( '"%s" is managed by WooCommerce. Use the wp_woo_* tools (wp_woo_save_product, wp_woo_save_coupon, wp_woo_update_order, wp_woo_delete) so stock, prices and order rules stay correct.', $type ), array( 'status' => 400 ) );
+		$error = apply_filters( 'wpmcp_owned_type_error', null, $type );
+		return is_wp_error( $error ) ? $error : null;
 	}
 
 	private static function validate_write_type( $type ) {
@@ -136,6 +176,10 @@ class WPMCP_Core {
 	}
 
 	private static function validate_type( $type ) {
+		$allowed = self::allowed_types();
+		if ( null !== $allowed && ! in_array( $type, $allowed, true ) ) {
+			return new WP_Error( 'wpmcp_plan', WPMCP_Plans::upgrade_text( 'pro', sprintf( 'Working with "%s" content', (string) $type ) ) . ' Free covers ' . implode( ' and ', $allowed ) . '.', array( 'status' => 403 ) );
+		}
 		if ( ! post_type_exists( $type ) ) {
 			return new WP_Error(
 				'wpmcp_unknown_type',
@@ -151,34 +195,36 @@ class WPMCP_Core {
 	/* ----------------------------------------------------------------- */
 
 	public static function ping() {
-		$types = array();
+		$allowed = self::allowed_types();
+		$types   = array();
 		foreach ( get_post_types( array( 'show_ui' => true ), 'objects' ) as $slug => $obj ) {
+			if ( null !== $allowed && ! in_array( $slug, $allowed, true ) ) { continue; }
 			$types[] = array(
 				'slug'  => $slug,
 				'label' => $obj->labels->name,
 			);
 		}
-		return array(
+		$out = array(
 			'ok'                 => true,
 			'plugin_version'     => WPMCP_VERSION,
+			'plan'               => array( 'plan' => WPMCP_Plans::current(), 'pro_addon' => WPMCP_Plans::pro_installed() ),
 			'site_name'          => get_bloginfo( 'name' ),
 			'site_url'           => home_url(),
 			'wp_version'         => get_bloginfo( 'version' ),
 			'php_version'        => PHP_VERSION,
 			'elementor_active'   => WPMCP_Elementor::is_active(),
 			'elementor'          => WPMCP_Elementor::environment(),
-			'editors'            => WPMCP_Builders::environment(),
-			'cache_plugins'      => WPMCP_Site::detected_caches(),
-			'acf'                => WPMCP_ACF::status(),
-			'woocommerce'        => WPMCP_Woo::status(),
 			'max_result_chars'   => (int) apply_filters( 'wpmcp_max_result_chars', WPMCP_MAX_RESULT_CHARS ),
 			'post_types'         => $types,
 		);
+		return apply_filters( 'wpmcp_ping', $out );
 	}
 
 	public static function list_post_types() {
-		$out = array();
+		$allowed = self::allowed_types();
+		$out     = array();
 		foreach ( get_post_types( array(), 'objects' ) as $slug => $obj ) {
+			if ( null !== $allowed && ! in_array( $slug, $allowed, true ) ) { continue; }
 			$out[] = array(
 				'slug'         => $slug,
 				'label'        => $obj->labels->name,
@@ -232,6 +278,8 @@ class WPMCP_Core {
 	}
 
 	public static function get_content( $type, $id, $include_elementor = true ) {
+		$allowed = self::allowed_types();
+		if ( null !== $allowed && ! in_array( $type, $allowed, true ) ) { return self::validate_type( $type ); }
 		$post = get_post( (int) $id );
 		if ( ! $post || $post->post_type !== $type ) {
 			return new WP_Error( 'wpmcp_not_found', 'Item not found for that type/id.', array( 'status' => 404 ) );
@@ -245,6 +293,10 @@ class WPMCP_Core {
 			return $valid;
 		}
 		$body = is_array( $body ) ? $body : array();
+		$gate = self::check_extras( $body );
+		if ( is_wp_error( $gate ) ) {
+			return $gate;
+		}
 
 		$postarr = array(
 			'post_type'    => $type,
@@ -267,23 +319,29 @@ class WPMCP_Core {
 		if ( is_wp_error( $post_id ) ) {
 			return $post_id;
 		}
-		$acf = self::apply_post_extras( $post_id, $body );
+		$extras = self::apply_post_extras( $post_id, $body );
 		WPMCP_History::record( 'wp_create_content', 'post', $post_id, $postarr['post_title'], sprintf( 'Created %s', $type ), array( 'op' => 'trash_created' ) );
 
-		return self::with_acf( array(
+		return self::with_extras( array(
 			'ok'   => true,
 			'post' => self::format_post( get_post( $post_id ), true ),
-		), $acf );
+		), $extras );
 	}
 
 	public static function update_content( $type, $id, $body ) {
 		$owned = self::owned_error( $type );
 		if ( $owned ) { return $owned; }
+		$allowed = self::allowed_types();
+		if ( null !== $allowed && ! in_array( $type, $allowed, true ) ) { return self::validate_type( $type ); }
 		$post = get_post( (int) $id );
 		if ( ! $post || $post->post_type !== $type ) {
 			return new WP_Error( 'wpmcp_not_found', 'Item not found for that type/id.', array( 'status' => 404 ) );
 		}
 		$body = is_array( $body ) ? $body : array();
+		$gate = self::check_extras( $body );
+		if ( is_wp_error( $gate ) ) {
+			return $gate;
+		}
 
 		$postarr = array( 'ID' => (int) $id );
 		if ( array_key_exists( 'title', $body ) ) {
@@ -313,19 +371,21 @@ class WPMCP_Core {
 		if ( is_wp_error( $result ) ) {
 			return $result;
 		}
-		$acf     = self::apply_post_extras( (int) $id, $body );
+		$extras  = self::apply_post_extras( (int) $id, $body );
 		$changed = array_values( array_intersect( array_keys( $body ), array( 'title', 'content', 'excerpt', 'status', 'slug', 'parent', 'menu_order', 'featured_media', 'meta', 'terms', 'elementor' ) ) );
 		WPMCP_History::finish_state( $history, 'wp_update_content', sprintf( 'Updated %s (%s)', $type, implode( ', ', $changed ) ) );
 
-		return self::with_acf( array(
+		return self::with_extras( array(
 			'ok'   => true,
 			'post' => self::format_post( get_post( (int) $id ), true ),
-		), $acf );
+		), $extras );
 	}
 
 	public static function delete_content( $type, $id, $force = false ) {
 		$owned = self::owned_error( $type );
 		if ( $owned ) { return $owned; }
+		$allowed = self::allowed_types();
+		if ( null !== $allowed && ! in_array( $type, $allowed, true ) ) { return self::validate_type( $type ); }
 		$post = get_post( (int) $id );
 		if ( ! $post || $post->post_type !== $type ) {
 			return new WP_Error( 'wpmcp_not_found', 'Item not found for that type/id.', array( 'status' => 404 ) );
@@ -433,97 +493,6 @@ class WPMCP_Core {
 		return $out;
 	}
 
-	/**
-	 * Write an Elementor layout and/or its page settings.
-	 *
-	 * "elements" replaces the whole layout unless the first item is a marker:
-	 *   {"elType":"__append__"}                 append the rest
-	 *   {"elType":"__replace__","index":N}      swap top-level section N
-	 *   {"elType":"__insert__","index":N}       insert before section N
-	 *
-	 * @param int         $id            Post ID.
-	 * @param array|null  $elements      Elements, or null to only touch settings.
-	 * @param array|null  $page_settings Optional _elementor_page_settings.
-	 * @return array|WP_Error
-	 */
-	public static function set_elementor( $id, $elements, $page_settings = null ) {
-		$post = get_post( (int) $id );
-		if ( ! $post ) {
-			return new WP_Error( 'wpmcp_not_found', 'Post not found.', array( 'status' => 404 ) );
-		}
-
-		$mode    = 'replace-all';
-		$history = WPMCP_History::begin_state( (int) $id, WPMCP_History::scope_for_elementor() );
-
-		if ( null !== $elements ) {
-			$marker = ( is_array( $elements ) && isset( $elements[0] ) && is_array( $elements[0] ) && isset( $elements[0]['elType'] ) )
-				? (string) $elements[0]['elType']
-				: '';
-
-			if ( in_array( $marker, array( '__append__', '__replace__', '__insert__' ), true ) ) {
-				$existing = WPMCP_Elementor::get_data( (int) $id );
-				$existing = ( isset( $existing['elements'] ) && is_array( $existing['elements'] ) ) ? $existing['elements'] : array();
-				$incoming = array_values( array_slice( $elements, 1 ) );
-				$index    = isset( $elements[0]['index'] ) ? (int) $elements[0]['index'] : 0;
-
-				if ( '__append__' === $marker ) {
-					$mode     = 'append';
-					$elements = array_merge( $existing, $incoming );
-				} elseif ( '__replace__' === $marker ) {
-					if ( ! isset( $existing[ $index ] ) ) {
-						return new WP_Error(
-							'wpmcp_bad_index',
-							sprintf( '__replace__ index %d does not exist. This page has %d top-level elements.', $index, count( $existing ) ),
-							array( 'status' => 400 )
-						);
-					}
-					$mode     = 'replace-section';
-					$elements = array_merge(
-						array_slice( $existing, 0, $index ),
-						$incoming,
-						array_slice( $existing, $index + 1 )
-					);
-				} else {
-					if ( $index < 0 || $index > count( $existing ) ) {
-						return new WP_Error(
-							'wpmcp_bad_index',
-							sprintf( '__insert__ index %d is out of range (0-%d).', $index, count( $existing ) ),
-							array( 'status' => 400 )
-						);
-					}
-					$mode     = 'insert';
-					$elements = array_merge(
-						array_slice( $existing, 0, $index ),
-						$incoming,
-						array_slice( $existing, $index )
-					);
-				}
-			}
-
-			$result = WPMCP_Elementor::set_data( (int) $id, $elements );
-			if ( is_wp_error( $result ) ) {
-				return $result;
-			}
-		}
-
-		if ( is_array( $page_settings ) ) {
-			WPMCP_Elementor::set_page_settings( (int) $id, $page_settings );
-			WPMCP_Elementor::clear_cache( (int) $id );
-		}
-
-		WPMCP_History::finish_state( $history, 'wp_set_elementor', null === $elements ? 'Changed Elementor page settings' : sprintf( 'Changed the Elementor layout (%s)', $mode ) );
-		$data = WPMCP_Elementor::get_data( (int) $id );
-		return array(
-			'ok'                    => true,
-			'id'                    => (int) $id,
-			'mode'                  => null === $elements ? 'page-settings-only' : $mode,
-			'elements_count'        => $data['elements_count'],
-			'raw_size'              => $data['raw_size'],
-			'page_settings_updated' => is_array( $page_settings ),
-			'link'                  => get_permalink( (int) $id ),
-		);
-	}
-
 	public static function list_media( $args = array() ) {
 		$per_page = min( 100, max( 1, (int) ( $args['per_page'] ?? 20 ) ) );
 		$page     = max( 1, (int) ( $args['page'] ?? 1 ) );
@@ -619,7 +588,19 @@ class WPMCP_Core {
 		);
 	}
 
+	private static function check_taxonomy( $taxonomy ) {
+		$allowed = self::allowed_taxonomies();
+		if ( null !== $allowed && ! in_array( $taxonomy, $allowed, true ) ) {
+			return new WP_Error( 'wpmcp_plan', WPMCP_Plans::upgrade_text( 'pro', sprintf( 'Using the "%s" taxonomy', (string) $taxonomy ) ) . ' Free covers ' . implode( ' and ', $allowed ) . '.', array( 'status' => 403 ) );
+		}
+		return null;
+	}
+
 	public static function list_terms( $taxonomy ) {
+		$gate = self::check_taxonomy( $taxonomy );
+		if ( $gate ) {
+			return $gate;
+		}
 		if ( ! taxonomy_exists( $taxonomy ) ) {
 			return new WP_Error( 'wpmcp_unknown_taxonomy', 'Taxonomy does not exist.', array( 'status' => 404 ) );
 		}
@@ -646,6 +627,10 @@ class WPMCP_Core {
 	}
 
 	public static function create_term( $taxonomy, $body ) {
+		$gate = self::check_taxonomy( $taxonomy );
+		if ( $gate ) {
+			return $gate;
+		}
 		if ( ! taxonomy_exists( $taxonomy ) ) {
 			return new WP_Error( 'wpmcp_unknown_taxonomy', 'Taxonomy does not exist.', array( 'status' => 404 ) );
 		}

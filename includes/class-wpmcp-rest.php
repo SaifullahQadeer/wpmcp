@@ -21,8 +21,11 @@ class WPMCP_REST {
 		return WPMCP_Auth::check( $request );
 	}
 
-	/** Refuse a route whose tool is outside the caller's access level. */
+	/** Refuse a route whose tool is outside the site's plan or the caller's access level. */
 	private function guard( $tool ) {
+		if ( ! WPMCP_Plans::allows( $tool ) ) {
+			return new WP_Error( 'wpmcp_plan', WPMCP_Plans::refusal( $tool ), array( 'status' => 403 ) );
+		}
 		return WPMCP_Permissions::allows( WPMCP_Auth::$level, $tool ) ? null : new WP_Error( 'wpmcp_level', WPMCP_Permissions::refusal( WPMCP_Auth::$level, $tool ), array( 'status' => 403 ) );
 	}
 
@@ -213,7 +216,10 @@ class WPMCP_REST {
 		} elseif ( ! $page_settings ) {
 			$elements = $body;
 		}
-		return $this->respond( WPMCP_Core::set_elementor( (int) $request['id'], $elements, $page_settings ) );
+		if ( ! class_exists( 'WPMCP_Pro_Elementor' ) ) {
+			return new WP_Error( 'wpmcp_plan', WPMCP_Plans::refusal( 'wp_set_elementor' ), array( 'status' => 403 ) );
+		}
+		return $this->respond( WPMCP_Pro_Elementor::set_elementor( (int) $request['id'], $elements, $page_settings ) );
 	}
 
 	public function list_media( $request ) {

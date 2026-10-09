@@ -17,7 +17,7 @@ class WPMCP_Admin {
 	/* Updates, menu, assets                                             */
 	/* ----------------------------------------------------------------- */
 
-	/** "Check for updates" link: look up the latest GitHub release now, then show the result where the link was clicked. */
+	/** "Check for updates" link: look up the latest release now, then show the result where the link was clicked. */
 	public function handle_update_check() {
 		if ( ! isset( $_GET['wpmcp_check_update'] ) || ! current_user_can( 'update_plugins' ) ) { return; }
 		check_admin_referer( 'wpmcp_check_update' );
@@ -33,7 +33,7 @@ class WPMCP_Admin {
 		$result  = sanitize_key( wp_unslash( $_GET['wpmcp_update_result'] ) );
 		if ( 'available' === $result ) { $class = 'notice-warning'; $text = 'WP MCP ' . $version . ' is available. Use the Update now link on the WP MCP row of the Plugins screen.'; }
 		elseif ( 'current' === $result ) { $class = 'notice-success'; $text = 'WP MCP is up to date (version ' . $version . ').'; }
-		else { $class = 'notice-error'; $text = 'Could not reach GitHub to check for updates. Try again in a few minutes.'; }
+		else { $class = 'notice-error'; $text = 'Could not reach the update server to check for updates. Try again in a few minutes.'; }
 		return '<div class="notice inline wpmcp-notice ' . esc_attr( $class ) . '"><p>' . esc_html( $text ) . '</p></div>';
 	}
 	public function update_notice() {
@@ -65,7 +65,7 @@ class WPMCP_Admin {
 	/* ----------------------------------------------------------------- */
 
 	private function tabs() {
-		return array( 'connect' => 'Connect', 'tools' => 'Tools', 'history' => 'History', 'security' => 'Security', 'system' => 'System' );
+		return array( 'connect' => 'Connect', 'tools' => 'Tools', 'history' => 'History', 'security' => 'Security', 'plan' => 'Plan', 'system' => 'System' );
 	}
 	private function tab_url( $tab ) {
 		return add_query_arg( array( 'page' => 'wp-mcp', 'tab' => $tab ), admin_url( 'admin.php' ) );
@@ -90,12 +90,10 @@ class WPMCP_Admin {
 			update_option( 'wpmcp_api_key', WPMCP_Auth::generate_key(), false );
 			$message = 'Key rotated. Update the key in each client that uses it.';
 		} elseif ( 'save' === $action ) {
-			foreach ( array( 'enabled', 'oauth_enabled', 'allow_url_key', 'extensions_enabled', 'allow_install', 'allow_edit', 'allow_activate' ) as $setting ) {
-				$value = isset( $_POST[ 'wpmcp_' . $setting ] ) ? '1' : '0';
-				if ( is_multisite() && in_array( $setting, array( 'extensions_enabled', 'allow_install', 'allow_edit', 'allow_activate' ), true ) ) { $value = '0'; }
-				update_option( 'wpmcp_' . $setting, $value );
+			foreach ( array( 'enabled', 'oauth_enabled', 'allow_url_key' ) as $setting ) {
+				update_option( 'wpmcp_' . $setting, isset( $_POST[ 'wpmcp_' . $setting ] ) ? '1' : '0' );
 			}
-			update_option( 'wpmcp_extension_owner', get_current_user_id() );
+			do_action( 'wpmcp_save_settings' ); // The Pro add-on saves its own switches here. The nonce and capability were checked above.
 			$key_level = isset( $_POST['wpmcp_key_level'] ) ? sanitize_key( wp_unslash( $_POST['wpmcp_key_level'] ) ) : 'full';
 			update_option( 'wpmcp_key_level', WPMCP_Permissions::valid( $key_level ) ? $key_level : 'full' );
 			$message = 'Settings saved.';
@@ -146,10 +144,10 @@ class WPMCP_Admin {
 		<button type="button" class="button wpmcp-icon-btn" data-copy="<?php echo esc_attr( $id ); ?>" aria-label="Copy" title="Copy"><span class="wpmcp-copy-icon"><?php echo $this->icon( 'copy', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput ?></span><span class="wpmcp-done-icon"><?php echo $this->icon( 'tick', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput ?></span></button></div>
 		<?php
 	}
-	private function toggle( $key, $title, $description, $default = '0' ) {
+	public function toggle( $key, $title, $description, $default = '0' ) {
 		?><label class="wpmcp-toggle"><input type="checkbox" name="wpmcp_<?php echo esc_attr( $key ); ?>" value="1" <?php checked( '1', get_option( 'wpmcp_' . $key, $default ) ); ?> /><span class="wpmcp-switch" aria-hidden="true"></span><span class="wpmcp-toggle-text"><strong><?php echo esc_html( $title ); ?></strong><small><?php echo esc_html( $description ); ?></small></span></label><?php
 	}
-	private function badge( $text, $tone = 'neutral' ) {
+	public function badge( $text, $tone = 'neutral' ) {
 		return '<span class="wpmcp-badge wpmcp-badge-' . esc_attr( $tone ) . '">' . esc_html( $text ) . '</span>';
 	}
 	private function row( $label, $value_html ) {
@@ -176,14 +174,12 @@ class WPMCP_Admin {
 	private function render_stats( $enabled ) {
 		$grants  = WPMCP_OAuth::list_grants();
 		$last    = $grants ? max( array_map( 'intval', array_column( $grants, 'last_used' ) ) ) : 0;
-		$active  = 0;
-		$tools   = WPMCP_Woo_Tools::visible( WPMCP_MCP::tools_spec() );
-		foreach ( $tools as $tool ) { list( $on ) = $this->tool_status( $tool['name'] ); if ( $on ) { $active++; } }
+		$tools   = $this->tool_inventory();
 		$tiles = array(
 			array( 'system', 'Server', $enabled ? 'Running' : 'Paused', $enabled ? 'ok' : 'warn' ),
 			array( 'users', 'Connected apps', (string) count( $grants ), '' ),
 			array( 'activity', 'Last activity', $last ? human_time_diff( $last ) . ' ago' : 'None yet', '' ),
-			array( 'layers', 'Tools available', $active . ' of ' . count( $tools ), '' ),
+			array( 'layers', 'Tools available', $tools['available'] . ' of ' . $tools['total'], '' ),
 		);
 		echo '<div class="wpmcp-stats">';
 		foreach ( $tiles as $tile ) { echo '<div class="wpmcp-stat"><span class="wpmcp-stat-icon">' . $this->icon( $tile[0], 18 ) . '</span><span class="wpmcp-stat-label">' . esc_html( $tile[1] ) . '</span><strong class="' . esc_attr( $tile[3] ) . '">' . esc_html( $tile[2] ) . '</strong></div>'; } // phpcs:ignore WordPress.Security.EscapeOutput -- icon() returns static markup.
@@ -272,55 +268,63 @@ class WPMCP_Admin {
 	/* ----------------------------------------------------------------- */
 
 	/** @return array{0:bool,1:string} whether the tool can run now, and what to turn on if not. */
+	/** @return array{0:bool,1:string} whether the tool can run now, and what to turn on or buy if not. */
 	private function tool_status( $name ) {
-		if ( 0 === strpos( $name, 'wp_acf_' ) ) { return WPMCP_ACF::available() ? array( true, '' ) : array( false, 'Needs ACF' ); }
-		if ( in_array( $name, WPMCP_Woo_Tools::names(), true ) ) { return WPMCP_Woo::available() ? array( true, '' ) : array( false, 'Needs WooCommerce' ); }
-		if ( ! in_array( $name, WPMCP_Extensions::tool_names(), true ) ) { return array( true, '' ); }
-		if ( is_multisite() ) { return array( false, 'Not supported on multisite' ); }
-		if ( '1' !== (string) get_option( 'wpmcp_extensions_enabled', '0' ) ) { return array( false, 'Turn on extension access' ); }
-		if ( 'wp_install_extension' === $name && '1' !== (string) get_option( 'wpmcp_allow_install', '0' ) ) { return array( false, 'Turn on installation' ); }
-		if ( in_array( $name, array( 'wp_edit_extension_file', 'wp_restore_extension_file' ), true ) && '1' !== (string) get_option( 'wpmcp_allow_edit', '0' ) ) { return array( false, 'Turn on code editing' ); }
-		if ( 'wp_set_extension_active' === $name && '1' !== (string) get_option( 'wpmcp_allow_activate', '0' ) ) { return array( false, 'Turn on activation' ); }
-		return array( true, '' );
+		if ( ! WPMCP_Plans::allows( $name ) ) { return array( false, WPMCP_Plans::label( WPMCP_Plans::plan_of( $name ) ) . ' plan' ); }
+		return apply_filters( 'wpmcp_tool_status', array( true, '' ), $name );
+	}
+
+	/** Every tool the screen should count: those offered to apps, plus the ones this plan locks that have no code installed. */
+	private function tool_inventory() {
+		$all    = WPMCP_MCP::tools_spec();
+		$offer  = apply_filters( 'wpmcp_offered_tools', $all );
+		$known  = array_column( $all, 'name' );
+		$locked = array();
+		foreach ( WPMCP_Plans::groups() as $group ) {
+			foreach ( $group[1] as $tool ) { if ( ! in_array( $tool, $known, true ) ) { $locked[] = $tool; } }
+		}
+		$available = 0;
+		foreach ( $offer as $spec ) { list( $on ) = $this->tool_status( $spec['name'] ); if ( $on ) { $available++; } }
+		return array( 'offered' => $offer, 'locked' => $locked, 'available' => $available, 'total' => count( $offer ) + count( $locked ) );
 	}
 
 	private function render_tools() {
 		$groups = array(
-			'Site & content'           => array( 'wp_ping', 'wp_list_post_types', 'wp_list_content', 'wp_get_content', 'wp_create_content', 'wp_update_content', 'wp_delete_content' ),
-			'Block editor (Gutenberg)' => array( 'wp_list_block_types', 'wp_get_blocks', 'wp_set_blocks' ),
-			'Elementor'                => array( 'wp_get_elementor', 'wp_set_elementor' ),
-			'Divi'                     => array( 'wp_get_divi', 'wp_set_divi' ),
-			'Media & taxonomy'         => array( 'wp_upload_media', 'wp_list_media', 'wp_list_terms', 'wp_create_term' ),
-			'Advanced Custom Fields'   => array( 'wp_acf_list', 'wp_acf_save_post_type', 'wp_acf_save_taxonomy', 'wp_acf_save_field_group', 'wp_acf_delete', 'wp_acf_get_values', 'wp_acf_set_values' ),
-			'WooCommerce'              => WPMCP_Woo_Tools::names(),
-			'Settings & cache'         => array( 'wp_get_settings', 'wp_update_settings', 'wp_clear_cache' ),
-			'History'                  => array( 'wp_list_history', 'wp_rollback' ),
-			'Plugins & themes'         => WPMCP_Extensions::tool_names(),
+			'Site & content'   => array( 'wp_ping', 'wp_list_post_types', 'wp_list_content', 'wp_get_content', 'wp_create_content', 'wp_update_content' ),
+			'Elementor'        => array( 'wp_get_elementor', 'wp_edit_elementor_text' ),
+			'Media & taxonomy' => array( 'wp_upload_media', 'wp_list_media', 'wp_list_terms', 'wp_create_term' ),
+			'History'          => array( 'wp_list_history' ),
 		);
+		foreach ( WPMCP_Plans::groups() as $label => $group ) { $groups[ $label ] = $group[1]; }
+		$inv   = $this->tool_inventory();
 		$specs = array();
-		$on    = 0;
-		foreach ( WPMCP_Woo_Tools::visible( WPMCP_MCP::tools_spec() ) as $spec ) {
-			$specs[ $spec['name'] ] = $spec;
-			list( $enabled ) = $this->tool_status( $spec['name'] );
-			if ( $enabled ) { $on++; }
-		}
+		foreach ( $inv['offered'] as $spec ) { $specs[ $spec['name'] ] = $spec; }
 		?>
-		<section class="wpmcp-panel"><div class="wpmcp-panel-head"><h2><?php echo $this->icon( 'tools' ); // phpcs:ignore WordPress.Security.EscapeOutput ?>Tools</h2><p><?php echo (int) $on; ?> of <?php echo (int) count( $specs ); ?> are on. Hover a tool to see what it does. Each app’s access level (Read only, Read and edit, Full access) decides which of these it can use. Plugin and theme tools stay off until you turn them on in Security.</p></div>
+		<section class="wpmcp-panel"><div class="wpmcp-panel-head"><h2><?php echo $this->icon( 'tools' ); // phpcs:ignore WordPress.Security.EscapeOutput ?>Tools</h2><p><?php echo (int) $inv['available']; ?> of <?php echo (int) $inv['total']; ?> are on. Hover a tool to see what it does. Each app’s access level (Read only, Read and edit, Full access) decides which of these it can use, and your plan decides which exist: <?php echo esc_html( WPMCP_Plans::label( WPMCP_Plans::current() ) ); ?> right now. Locked tools are in the Plus and Pro plans (see the Plan tab).</p></div>
 		<?php foreach ( $groups as $group => $names ) :
-			if ( ! array_intersect( $names, array_keys( $specs ) ) ) { continue; } // A group whose tools are not offered (WooCommerce while it is off) is not shown.
+			$shown = array_filter( $names, function ( $tool ) use ( $specs, $inv ) { return isset( $specs[ $tool ] ) || in_array( $tool, $inv['locked'], true ); } );
+			if ( ! $shown ) { continue; } // A group whose tools are not offered (WooCommerce while it is off) is not shown.
 			?>
 			<h3 class="wpmcp-group"><?php echo esc_html( $group ); ?></h3>
 			<ul class="wpmcp-toollist">
-			<?php foreach ( $names as $name ) :
-				if ( ! isset( $specs[ $name ] ) ) { continue; }
-				$spec  = $specs[ $name ];
-				$parts = preg_split( '/(?<=[.!?])\s/', (string) $spec['description'], 2 );
-				if ( false !== strpos( $name, 'delete' ) ) { $access = $this->badge( 'Delete', 'danger' ); }
-				elseif ( ! empty( $spec['annotations']['readOnlyHint'] ) ) { $access = $this->badge( 'Read', 'neutral' ); }
-				else { $access = $this->badge( 'Write', 'warn' ); }
+			<?php foreach ( $shown as $name ) :
 				list( $enabled, $why ) = $this->tool_status( $name );
+				if ( isset( $specs[ $name ] ) ) {
+					$spec  = $specs[ $name ];
+					$parts = preg_split( '/(?<=[.!?])\s/', (string) $spec['description'], 2 );
+					$title = isset( $spec['title'] ) ? $spec['title'] : $name;
+					$tip   = $parts[0];
+					if ( false !== strpos( $name, 'delete' ) ) { $access = $this->badge( 'Delete', 'danger' ); }
+					elseif ( ! empty( $spec['annotations']['readOnlyHint'] ) ) { $access = $this->badge( 'Read', 'neutral' ); }
+					else { $access = $this->badge( 'Write', 'warn' ); }
+				} else {
+					$title  = ucfirst( str_replace( '_', ' ', substr( $name, 3 ) ) );
+					$tip    = 'Part of the ' . WPMCP_Plans::label( WPMCP_Plans::plan_of( $name ) ) . ' plan.';
+					$access = '';
+				}
+				if ( ! WPMCP_Plans::allows( $name ) ) { $access = $this->badge( WPMCP_Plans::label( WPMCP_Plans::plan_of( $name ) ), 'coral' ); $why = ''; }
 				?>
-				<li class="<?php echo $enabled ? '' : 'is-off'; ?>" title="<?php echo esc_attr( $parts[0] ); ?>"><span class="wpmcp-tool-main"><strong><?php echo esc_html( isset( $spec['title'] ) ? $spec['title'] : $name ); ?></strong><code><?php echo esc_html( $name ); ?></code></span><span class="wpmcp-tool-meta"><?php echo $enabled ? '' : '<small class="wpmcp-why">' . esc_html( $why ) . '</small>'; echo $access; // phpcs:ignore WordPress.Security.EscapeOutput -- badge() escapes. ?></span></li>
+				<li class="<?php echo $enabled ? '' : 'is-off'; ?>" title="<?php echo esc_attr( $tip ); ?>"><span class="wpmcp-tool-main"><strong><?php echo esc_html( $title ); ?></strong><code><?php echo esc_html( $name ); ?></code></span><span class="wpmcp-tool-meta"><?php echo $enabled || '' === $why ? '' : '<small class="wpmcp-why">' . esc_html( $why ) . '</small>'; echo $access; // phpcs:ignore WordPress.Security.EscapeOutput -- badge() escapes. ?></span></li>
 			<?php endforeach; ?>
 			</ul>
 		<?php endforeach; ?>
@@ -358,7 +362,9 @@ class WPMCP_Admin {
 				elseif ( $row['can_rollback'] ) { echo $this->badge( 'Applied', 'ok' ); } // phpcs:ignore WordPress.Security.EscapeOutput
 				else { echo $this->badge( 'Cannot roll back', 'off' ); } // phpcs:ignore WordPress.Security.EscapeOutput
 				?></td>
-				<td class="wpmcp-right"><?php if ( 'applied' === $row['status'] && $row['can_rollback'] ) : ?>
+				<td class="wpmcp-right"><?php if ( 'applied' === $row['status'] && $row['can_rollback'] && ! WPMCP_Plans::at_least( 'pro' ) ) : ?>
+						<?php echo $this->badge( 'Pro', 'coral' ); // phpcs:ignore WordPress.Security.EscapeOutput -- badge() escapes. ?><small class="wpmcp-why">Rolling back is in the Pro plan</small>
+					<?php elseif ( 'applied' === $row['status'] && $row['can_rollback'] ) : ?>
 					<form method="post"><?php $this->form_fields( 'rollback', 'history' ); ?><input type="hidden" name="wpmcp_entry" value="<?php echo esc_attr( $id ); ?>" />
 					<?php if ( $force === $id ) : ?><input type="hidden" name="wpmcp_force" value="1" /><button class="button button-primary" data-confirm="This item was edited after the change. Rolling back overwrites those edits. Continue?">Roll back anyway</button>
 					<?php else : ?><button class="button" data-confirm="Roll back this change?">Roll back</button><?php endif; ?></form>
@@ -383,9 +389,8 @@ class WPMCP_Admin {
 		<?php $this->toggle( 'enabled', 'Enable MCP server', 'Allow authenticated apps to use this site’s tools. Turn off to pause everything.', '1' ); $this->toggle( 'oauth_enabled', 'Allow sign-in with OAuth', 'Lets AI apps connect with a Connect button and your approval, with no key to copy. Requires HTTPS.', '1' ); $this->toggle( 'allow_url_key', 'Allow API keys in URLs', 'For apps that cannot send headers. Headers keep keys out of server logs, so leave this off if you can.', '1' ); ?>
 		<div class="wpmcp-select-row"><label for="wpmcp_key_level"><strong>Access for the API key</strong><small>What an app using the API key may do. Apps that sign in with OAuth get their own access level when you approve them.</small></label><select id="wpmcp_key_level" name="wpmcp_key_level"><?php foreach ( WPMCP_Permissions::levels() as $level_id => $info ) : ?><option value="<?php echo esc_attr( $level_id ); ?>"<?php echo WPMCP_Permissions::normalize( get_option( 'wpmcp_key_level', 'full' ) ) === $level_id ? ' selected' : ''; ?>><?php echo esc_html( $info[0] ); ?></option><?php endforeach; ?></select></div>
 		</section>
-		<section class="wpmcp-panel"><div class="wpmcp-panel-head"><h2><?php echo $this->icon( 'layers' ); ?>Plugins & themes</h2><p>Extension tools use the WordPress permissions of the administrator who saves these settings. They need HTTPS and a signed-in app or an API key header. Multisite is not supported.</p></div>
-		<?php $this->toggle( 'extensions_enabled', 'Allow extension access', 'List installed plugins and themes and read their editable files.' ); $this->toggle( 'allow_install', 'Allow installation', 'Install from WordPress.org. Installed extensions stay inactive.' ); $this->toggle( 'allow_edit', 'Allow code editing', 'Edit existing source files. Changes can break the site, so use a backup or staging site.' ); $this->toggle( 'allow_activate', 'Allow activation', 'Activate or deactivate installed plugins and switch the theme. WP MCP itself cannot be deactivated this way.' ); ?>
-		<div class="wpmcp-save"><button class="button button-primary button-hero">Save settings</button><span>Installation, editing and activation also need extension access.</span></div></section>
+		<?php do_action( 'wpmcp_security_panels', $this ); ?>
+		<div class="wpmcp-save"><button class="button button-primary button-hero">Save settings</button></div>
 		</form>
 
 		<section class="wpmcp-panel"><div class="wpmcp-panel-head"><h2><?php echo $this->icon( 'key' ); ?>API key</h2><p>For apps that cannot sign in with OAuth. Anyone with this key can use the enabled tools, so treat it like a password.</p></div>
@@ -416,7 +421,7 @@ class WPMCP_Admin {
 		<table class="wpmcp-kv"><tbody>
 		<?php
 		$this->row( 'Version', esc_html( WPMCP_VERSION ) . ( $new ? ' ' . $this->badge( 'Update available: ' . $new, 'warn' ) : ' ' . $this->badge( 'Up to date', 'ok' ) ) . ( current_user_can( 'update_plugins' ) ? ' <a class="button button-small" href="' . esc_url( $check ) . '">Check for updates</a>' : '' ) );
-		$this->row( 'Updates from', '<a href="https://github.com/SaifullahQadeer/wpmcp/releases" target="_blank" rel="noopener">GitHub releases</a>' );
+		$this->row( 'Updates from', esc_html( wp_parse_url( WPMCP_Updater::server(), PHP_URL_HOST ) ) );
 		$this->row( 'Author', 'Saifullah Qadeer' );
 		?>
 		</tbody></table></section>
@@ -443,16 +448,7 @@ class WPMCP_Admin {
 		?>
 		</tbody></table></section>
 
-		<section class="wpmcp-panel"><div class="wpmcp-panel-head"><h2><?php echo $this->icon( 'shield' ); ?>File safety & recovery</h2></div>
-		<p>Every source-file edit is checked before saving and keeps a pre-edit snapshot in the database. WP MCP retains the latest ten snapshots per file. PHP checks catch syntax errors, missing tags and unexpected text outside PHP; JSON is validated too. These checks do not guarantee correct runtime behavior.</p>
-		<p>Ask your assistant to validate with <code>dry_run: true</code>, apply one change, then check <code>wp_ping</code> and the affected page. To undo an edit, use <code>wp_list_file_backups</code> and <code>wp_restore_extension_file</code> with the current file hash.</p>
-		<details><summary>If the site or connector stops responding</summary><ol>
-		<li>Stop issuing edits. Keep the exact error and the path of the last changed file.</li>
-		<li>If WordPress still works, use the snapshot restore tool. Snapshots cover edits made with WP MCP 2.3.0 onward, not earlier changes.</li>
-		<li>If WordPress or its API cannot start, restore the affected file from a known-good hosting backup using your host’s file manager or SFTP. WordPress Recovery Mode may also provide admin access.</li>
-		<li>Verify the homepage, admin and MCP connection before resuming. Keep an independent hosting backup and test code changes on staging.</li>
-		</ol><p>This plugin cannot repair a server outage, database outage, or code failure that prevents it from loading. Database snapshots are not a full-site backup. Editing plugin or theme files may be overwritten by later updates.</p></details>
-		</section>
+		<?php do_action( 'wpmcp_system_panels', $this ); ?>
 		<?php
 	}
 
@@ -461,28 +457,22 @@ class WPMCP_Admin {
 	/* ----------------------------------------------------------------- */
 
 	/** Setup checks. State is ok, warn (needs attention) or info (optional, not installed). */
+	/** Setup checks. State is ok, warn (needs attention) or info (optional, not installed). The Pro add-on adds its own through "wpmcp_health_checks". */
 	private function health_checks() {
 		$enabled = '1' === (string) get_option( 'wpmcp_enabled', '1' );
 		$https   = 'https' === wp_parse_url( home_url(), PHP_URL_SCHEME );
 		$pretty  = (bool) get_option( 'permalink_structure' );
 		$el      = WPMCP_Elementor::environment();
-		$divi    = WPMCP_Builders::divi_info();
-		$caches  = WPMCP_Site::detected_caches();
-		$acf     = WPMCP_ACF::status();
-		$woo     = WPMCP_Woo::status();
-		return array(
+		$checks  = array(
 			array( $enabled ? 'ok' : 'warn', 'MCP server', $enabled ? 'Running' : 'Paused. Turn it on in Security.' ),
-			array( $https ? 'ok' : 'warn', 'HTTPS', $https ? 'On' : 'Off. Sign-in and extension tools need it.' ),
+			array( $https ? 'ok' : 'warn', 'HTTPS', $https ? 'On' : 'Off. Sign-in needs it.' ),
 			array( $pretty ? 'ok' : 'warn', 'Pretty permalinks', $pretty ? 'On' : 'Off. The REST API address needs them.' ),
 			array( WPMCP_OAuth::enabled() ? 'ok' : 'warn', 'OAuth sign-in', WPMCP_OAuth::enabled() ? 'On' : 'Off. Apps need an API key instead.' ),
 			array( version_compare( PHP_VERSION, '7.4', '>=' ) ? 'ok' : 'warn', 'PHP', PHP_VERSION ),
-			array( 'ok', 'Block editor', 'Active' ),
 			array( ! empty( $el['active'] ) ? 'ok' : 'info', 'Elementor', ! empty( $el['active'] ) ? $el['version'] . ' · ' . $el['generation'] : 'Not installed' ),
-			array( ! empty( $divi['active'] ) ? 'ok' : 'info', 'Divi', ! empty( $divi['active'] ) ? $divi['version'] . ' · ' . $divi['generation'] : 'Not installed' ),
-			array( ! empty( $acf['active'] ) ? 'ok' : 'info', 'Advanced Custom Fields', ! empty( $acf['active'] ) ? 'ACF ' . $acf['version'] . ' · ' . ( 'pro' === $acf['edition'] ? 'Pro' : 'free' ) : 'Not installed' ),
-			array( ! empty( $woo['active'] ) ? 'ok' : 'info', 'WooCommerce', ! empty( $woo['active'] ) ? $woo['version'] . ' · orders in ' . $woo['orders_storage'] : 'Not installed' ),
-			array( $caches ? 'ok' : 'info', 'Page cache', $caches ? implode( ', ', $caches ) : 'None detected' ),
+			array( WPMCP_Plans::pro_installed() ? 'ok' : 'info', 'WP MCP Pro add-on', WPMCP_Plans::pro_installed() ? WPMCP_Plans::label( WPMCP_Plans::current() ) . ' plan' : 'Not installed. Free plan.' ),
 		);
+		return apply_filters( 'wpmcp_health_checks', $checks );
 	}
 
 	private function render_health() {
@@ -498,35 +488,64 @@ class WPMCP_Admin {
 	}
 
 	/** What WP MCP works with, and which of it is installed on this site. */
+	/** What WP MCP works with, and which of it is installed on this site. The Pro add-on adds tiles for what its plan covers. */
 	private function render_compat() {
 		$el      = WPMCP_Elementor::environment();
-		$ed      = WPMCP_Builders::environment();
-		$divi    = $ed['divi'];
-		$caches  = WPMCP_Site::detected_caches();
 		$el_on   = ! empty( $el['active'] );
 		$el_v4   = $el_on && 'v4-atomic' === $el['generation'];
-		$divi_on = ! empty( $divi['active'] );
-		$acf     = WPMCP_ACF::status();
-		$woo     = WPMCP_Woo::status();
+		$plus    = WPMCP_Plans::at_least( 'plus' );
+		$pro     = WPMCP_Plans::at_least( 'pro' );
+		$layouts = $plus ? 'Containers, sections and widgets, plus page settings.' : 'Read layouts and change their text.';
 		$tiles   = array(
-			array( 'layers', 'Block editor (Gutenberg)', 'Block pages, patterns and templates, with markup checked before it is saved.', true, ! empty( $ed['gutenberg']['block_theme'] ) ? 'Block theme' : 'Active' ),
-			array( 'tools', 'Elementor 3 (classic)', 'Containers, sections and widgets, plus page settings.', $el_on && ! $el_v4, $el_on && ! $el_v4 ? $el['version'] : '' ),
-			array( 'sparkles', 'Elementor 4 (atomic)', 'Atomic editor layouts in the v4 data shape.', $el_v4, $el_v4 ? $el['version'] : '' ),
-			array( 'code', 'Divi 4 (shortcodes)', 'Sections, rows and modules, read and written section by section.', $divi_on && 'v4-shortcodes' === $divi['generation'], $divi_on && 'v4-shortcodes' === $divi['generation'] ? $divi['version'] : '' ),
-			array( 'code', 'Divi 5 (blocks)', 'Block-based layouts through the block editor tools.', $divi_on && 'v5-blocks' === $divi['generation'], $divi_on && 'v5-blocks' === $divi['generation'] ? $divi['version'] : '' ),
-			array( 'key', 'Advanced Custom Fields', 'Free and Pro: create post types, taxonomies and field groups, and read and write field values.', ! empty( $acf['active'] ), ! empty( $acf['active'] ) ? $acf['version'] . ( 'pro' === $acf['edition'] ? ' Pro' : ' free' ) : '' ),
-			array( 'cart', 'WooCommerce', 'Products, variations, orders, coupons, stock and store settings, through WooCommerce itself.', ! empty( $woo['active'] ), ! empty( $woo['active'] ) ? $woo['version'] : '' ),
-			array( 'book', 'Posts, pages and custom types', 'Content, media, terms and custom fields, with history and rollback.', true, 'Active' ),
-			array( 'system', 'Caches', 'Object cache, Elementor and Divi CSS, and page cache plugins such as LiteSpeed, WP Rocket and W3 Total Cache.', (bool) $caches, $caches ? implode( ', ', $caches ) : '' ),
-			array( 'key', 'Site settings and plugins', 'Title, permalinks, homepage, and plugin and theme activation (opt-in).', true, 'Active' ),
+			array( 'tools', 'Elementor 3 (classic)', $layouts, $el_on && ! $el_v4, $el_on && ! $el_v4 ? $el['version'] : '' ),
+			array( 'sparkles', 'Elementor 4 (atomic)', $plus ? 'Atomic editor layouts in the v4 data shape.' : 'Read atomic layouts and change their text.', $el_v4, $el_v4 ? $el['version'] : '' ),
+			array( 'book', 'Posts and pages', 'Content, media, categories and tags.', true, 'Active' ),
 		);
+		if ( ! $plus ) {
+			$tiles[] = array( 'layers', 'Block editor and Divi', 'Gutenberg, Divi 4 and Divi 5 layouts, and clearing caches.', false, '', 'Plus' );
+		}
+		if ( ! $pro ) {
+			$tiles[] = array( 'cart', 'WooCommerce', 'Products, orders, coupons, stock and store settings.', false, '', 'Pro' );
+			$tiles[] = array( 'key', 'Advanced Custom Fields', 'Fields, groups, custom post types and taxonomies.', false, '', 'Pro' );
+			$tiles[] = array( 'system', 'Site tools', 'Delete, undo, settings, plugins and themes.', false, '', 'Pro' );
+		}
+		$tiles = apply_filters( 'wpmcp_compat_tiles', $tiles );
 		?>
-		<section class="wpmcp-panel"><div class="wpmcp-panel-head"><h2><?php echo $this->icon( 'check' ); // phpcs:ignore WordPress.Security.EscapeOutput ?>Works with</h2><p>Page builders and tools your AI app can work with. Green means it is active on this site; Ready means it is supported once you install it.</p></div>
+		<section class="wpmcp-panel"><div class="wpmcp-panel-head"><h2><?php echo $this->icon( 'check' ); // phpcs:ignore WordPress.Security.EscapeOutput ?>Works with</h2><p>Page builders and tools your AI app can work with. Green means it is active on this site; Ready means it is supported once you install it; Plus and Pro mark what needs a paid plan.</p></div>
 		<div class="wpmcp-compat-grid"><?php foreach ( $tiles as $tile ) : ?>
 			<div class="wpmcp-compat"><span class="wpmcp-compat-icon"><?php echo $this->icon( $tile[0], 18 ); // phpcs:ignore WordPress.Security.EscapeOutput ?></span><div><strong><?php echo esc_html( $tile[1] ); ?></strong><small><?php echo esc_html( $tile[2] ); ?></small></div>
-			<?php echo $tile[3] ? $this->badge( '' !== $tile[4] ? $tile[4] : 'Installed', 'ok' ) : $this->badge( 'Ready', 'neutral' ); // phpcs:ignore WordPress.Security.EscapeOutput ?></div>
+			<?php echo ! empty( $tile[5] ) ? $this->badge( $tile[5], 'coral' ) : ( $tile[3] ? $this->badge( '' !== $tile[4] ? $tile[4] : 'Installed', 'ok' ) : $this->badge( 'Ready', 'neutral' ) ); // phpcs:ignore WordPress.Security.EscapeOutput ?></div>
 		<?php endforeach; ?></div></section>
 		<?php
+	}
+
+	/** Plan tab: what each plan includes, where this site stands, and how to unlock more. */
+	private function render_plan() {
+		$plan     = WPMCP_Plans::current();
+		$features = WPMCP_Plans::features();
+		$blurbs   = array( 'free' => 'Start using WordPress with AI.', 'plus' => 'AI-powered website design.', 'pro' => 'Complete WordPress AI management.' );
+		?>
+		<section class="wpmcp-panel"><div class="wpmcp-panel-head"><h2><?php echo $this->icon( 'sparkles' ); // phpcs:ignore WordPress.Security.EscapeOutput ?>Your plan <?php echo $this->badge( WPMCP_Plans::label( $plan ), 'free' === $plan ? 'neutral' : 'coral' ); // phpcs:ignore WordPress.Security.EscapeOutput ?></h2><p><?php echo 'free' === $plan ? 'You are on the free plan. Plus and Pro add page-builder, WooCommerce and ACF support through the WP MCP Pro add-on.' : 'Your license unlocks everything in the ' . esc_html( WPMCP_Plans::label( $plan ) ) . ' plan.'; ?></p></div>
+		<div class="wpmcp-plans">
+		<?php foreach ( array( 'free', 'plus', 'pro' ) as $id ) : ?>
+			<div class="wpmcp-plan-card<?php echo $id === $plan ? ' is-current' : ''; ?>">
+				<h3><?php echo esc_html( WPMCP_Plans::label( $id ) ); ?><?php echo $id === $plan ? ' ' . $this->badge( 'Your plan', 'ok' ) : ''; // phpcs:ignore WordPress.Security.EscapeOutput ?></h3>
+				<p><?php echo esc_html( $blurbs[ $id ] ); ?></p>
+				<ul class="wpmcp-checks"><?php foreach ( $features[ $id ] as $feature ) : ?><li><?php echo $this->icon( 'tick', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput ?><span><?php echo esc_html( $feature ); ?></span></li><?php endforeach; ?></ul>
+			</div>
+		<?php endforeach; ?>
+		</div>
+		<p class="wpmcp-plan-link"><a class="wpmcp-link" href="<?php echo esc_url( WPMCP_Plans::UPGRADE_URL ); ?>" target="_blank" rel="noopener">See plans and pricing <?php echo $this->icon( 'external', 14 ); // phpcs:ignore WordPress.Security.EscapeOutput ?></a></p>
+		</section>
+		<?php
+		if ( WPMCP_Plans::pro_installed() ) {
+			do_action( 'wpmcp_plan_panels', $this );
+		} else {
+			?>
+			<section class="wpmcp-panel"><div class="wpmcp-panel-head"><h2><?php echo $this->icon( 'key' ); // phpcs:ignore WordPress.Security.EscapeOutput ?>Unlock Plus or Pro</h2><p>Paid plans come from the WP MCP Pro add-on, a separate plugin that works with this one.</p></div>
+			<ol class="wpmcp-list"><li>Get a Plus or Pro license and the WP MCP Pro add-on from the plans page.</li><li>Install and activate the add-on on this site, next to WP MCP.</li><li>Come back to this tab and enter your license key.</li></ol></section>
+			<?php
+		}
 	}
 
 	/* ----------------------------------------------------------------- */
@@ -647,7 +666,7 @@ class WPMCP_Admin {
 		$new     = ( new WPMCP_Updater() )->cached_update();
 		$notice  = get_transient( 'wpmcp_notice_' . get_current_user_id() );
 		delete_transient( 'wpmcp_notice_' . get_current_user_id() );
-		$icons   = array( 'connect' => 'connect', 'tools' => 'tools', 'history' => 'history', 'security' => 'shield', 'system' => 'system' );
+		$icons   = array( 'connect' => 'connect', 'tools' => 'tools', 'history' => 'history', 'security' => 'shield', 'plan' => 'sparkles', 'system' => 'system' );
 		?>
 		<div class="wrap wpmcp">
 		<header class="wpmcp-header"><div class="wpmcp-brand"><img class="wpmcp-logo" src="<?php echo esc_url( WPMCP_PLUGIN_URL . 'assets/brand/wp-mcp-icon.png' ); ?>" width="254" height="36" alt="" /><div><h1>WP MCP <span>v<?php echo esc_html( WPMCP_VERSION ); ?></span></h1><p>Let AI apps manage your WordPress site, with you in control.</p></div></div>
@@ -664,6 +683,7 @@ class WPMCP_Admin {
 		if ( 'tools' === $tab ) { $this->render_tools(); }
 		elseif ( 'history' === $tab ) { $this->render_history(); }
 		elseif ( 'security' === $tab ) { $this->render_security( $key ); }
+		elseif ( 'plan' === $tab ) { $this->render_plan(); }
 		elseif ( 'system' === $tab ) { $this->render_system( $url ); }
 		else { $this->render_stats( $enabled ); $this->render_connect( $url ); $this->render_connected(); $this->render_compat(); }
 		?>

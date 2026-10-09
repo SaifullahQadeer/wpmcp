@@ -1,14 +1,14 @@
 <?php
 /**
  * Plugin Name:       WP MCP
- * Description:       Turns this WordPress site into its own remote MCP server so Claude, Gemini or any MCP client can manage pages, posts, custom post types, media, taxonomies, ACF fields, WooCommerce stores, and Gutenberg, Divi and Elementor layouts.
- * Version:           2.13.0
+ * Description:       Turns this WordPress site into its own remote MCP server so Claude, Gemini or any MCP client can manage posts, pages and media, and change text on Elementor pages. Plus and Pro plans add full page-builder, WooCommerce and ACF support through the WP MCP Pro add-on.
+ * Version:           3.0.0
  * Author:            Saifullah Qadeer
  * License:           GPL-2.0-or-later
  * Text Domain:       wp-mcp
  * Requires at least: 5.6
  * Requires PHP:      7.4
- * Update URI:        https://github.com/SaifullahQadeer/wpmcp
+ * Update URI:        https://updates.wpmcp.co/wp-mcp
  *
  * Elementor tested up to: 4.x
  */
@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // No direct access.
 }
 
-define( 'WPMCP_VERSION', '2.13.0' );
+define( 'WPMCP_VERSION', '3.0.0' );
 define( 'WPMCP_NAMESPACE', 'wpmcp/v1' );
 define( 'WPMCP_PLUGIN_FILE', __FILE__ );
 define( 'WPMCP_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
@@ -29,18 +29,13 @@ if ( ! defined( 'WPMCP_MAX_RESULT_CHARS' ) ) {
 	define( 'WPMCP_MAX_RESULT_CHARS', 140000 );
 }
 
+require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-plans.php';
 require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-permissions.php';
 require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-auth.php';
 require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-oauth.php';
 require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-history.php';
-require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-builders.php';
-require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-site.php';
-require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-acf.php';
-require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-woo.php';
-require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-woo-tools.php';
-require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-file-safety.php';
-require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-extensions.php';
 require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-elementor.php';
+require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-elementor-text.php';
 require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-core.php';
 require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-rest.php';
 require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-mcp.php';
@@ -64,16 +59,6 @@ function wpmcp_activate() {
 	}
 }
 register_activation_hook( __FILE__, 'wpmcp_activate' );
-
-/**
- * WooCommerce checks plugins for High-Performance Order Storage compatibility. WP MCP only reaches
- * orders through WooCommerce's own order functions, never the order tables, so it is compatible.
- */
-add_action( 'before_woocommerce_init', function () {
-	if ( class_exists( '\Automattic\WooCommerce\Utilities\FeaturesUtil' ) ) {
-		\Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility( 'custom_order_tables', WPMCP_PLUGIN_FILE, true );
-	}
-} );
 
 /**
  * Bootstrap the plugin.

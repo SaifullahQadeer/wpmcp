@@ -248,3 +248,17 @@ body.toplevel_page_wp-mcp #wpbody-content .notice:not(.wpmcp-notice),body.toplev
 .wpmcp-level input:focus-visible~.wpmcp-level-dot{outline:2px solid var(--accent);outline-offset:2px}
 .wpmcp-actions{display:flex;gap:10px;flex-wrap:wrap}
 @media(max-width:640px){.wpmcp-consent{margin-top:16px}.wpmcp-actions .button{flex:1;justify-content:center}}
+
+/* Plan tab */
+.wpmcp-plans{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:4px}
+.wpmcp-plan-card{border:1.5px solid var(--line);border-radius:14px;padding:18px 20px;background:var(--bg)}
+.wpmcp-plan-card.is-current{border-color:var(--ink);background:var(--card)}
+.wpmcp-plan-card h3{display:flex;align-items:center;gap:8px;font-size:16px;font-weight:700;letter-spacing:-.01em;margin:0 0 4px;padding:0}
+.wpmcp-plan-card>p{margin:0 0 14px;font-size:13px}
+.wpmcp-checks{list-style:none;margin:0;padding:0}
+.wpmcp-checks li{display:flex;gap:10px;align-items:flex-start;padding:5px 0;font-size:13px;color:var(--ink)}
+.wpmcp-checks .wpmcp-icon{color:var(--ok);margin-top:2px}
+.wpmcp-plan-link{margin:18px 0 0}
+.wpmcp-license-form{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.wpmcp-license-form input[type=text]{flex:1;min-width:260px;font-family:Consolas,Menlo,monospace;font-size:12px;padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);box-shadow:none}
+@media(max-width:900px){.wpmcp-plans{grid-template-columns:minmax(0,1fr)}}

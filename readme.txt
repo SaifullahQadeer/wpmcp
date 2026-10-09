@@ -3,21 +3,38 @@ Author: Saifullah Qadeer
 Requires at least: 5.6
 Requires PHP: 7.4
 Tested with Elementor: 4.x
-Stable tag: 2.13.0
+Stable tag: 3.0.0
 License: GPL-2.0-or-later
 
 Turns a WordPress site into its own remote MCP server, so Claude (web, Desktop,
-Cowork, Claude Code), Gemini or any MCP client can manage pages, posts, custom
-post types, media, taxonomies, WooCommerce stores and Elementor layouts. No local software needed.
+Cowork, Claude Code), Gemini or any MCP client can manage posts and pages, media and
+categories, and change the text on Elementor pages. No local software needed. Plus and Pro
+plans add page builders, WooCommerce, ACF and more through the separate WP MCP Pro add-on.
 
-== Upgrading to 2.1.0 ==
+== Plans ==
 
-Deactivate the previous plugin before installing and activating this version.
-The entry file is now wp-mcp.php, and all internal identifiers use WPMCP/wpmcp.
-Activation creates new settings and a new API key; previous settings and keys
-are not migrated. Review the enabled setting in the WP MCP admin menu.
-Copy the new connection URL into each MCP client. Previous endpoint URLs,
-custom header names, query parameters, and filter names are no longer supported.
+Free (this plugin)
+    MCP connection and sign-in, posts and pages, basic media tools, categories and tags,
+    reading Elementor pages and changing their text, and the Read only / Read and edit levels.
+Plus (WP MCP Pro add-on)
+    Everything in Free, plus full Elementor editing, Divi 4 and 5, block editor layouts and
+    clearing caches.
+Pro (WP MCP Pro add-on)
+    Everything in Plus, plus WooCommerce, Advanced Custom Fields, custom post types and
+    taxonomies, deleting content, undo, site settings, and plugin and theme tools.
+
+The Plan tab in the WP MCP screen shows what each plan includes and where this site stands.
+Anything the plan does not include is not offered to AI apps, and a call to it is refused with an
+explanation. Plus and Pro come from the WP MCP Pro add-on, a separate plugin that needs this one
+and a license key. The key is checked on your server; nothing is sent anywhere.
+
+== Upgrading to 3.0.0 ==
+
+Version 3.0.0 moves everything beyond the Free plan into the WP MCP Pro add-on. If you used
+WooCommerce, ACF, Divi, block editor, cache, settings, delete, undo or plugin and theme tools
+with an earlier version, those tools are not part of this plugin any more. Install and activate
+the WP MCP Pro add-on and enter a Plus or Pro license to get them back. Nothing is deleted:
+your content, history and settings are untouched, and the add-on picks them up again.
 
 == Connecting ==
 
@@ -40,210 +57,56 @@ keys are not accepted.
 Requirements: the site must be on HTTPS, and permalinks must not be set to
 "Plain" (otherwise /wp-json/ 404s).
 
-== Tools (38, and 19 more with WooCommerce) ==
+== Tools in Free (13) ==
 
 wp_ping, wp_list_post_types, wp_list_content, wp_get_content, wp_create_content,
-wp_update_content, wp_delete_content, wp_get_elementor, wp_set_elementor,
-wp_upload_media, wp_list_media, wp_list_terms, wp_create_term,
-wp_list_extensions, wp_install_extension, wp_list_extension_files,
-wp_read_extension_file, wp_edit_extension_file, wp_list_file_backups,
-wp_restore_extension_file, wp_set_extension_active, wp_list_history, wp_rollback,
-wp_list_block_types, wp_get_blocks, wp_set_blocks, wp_get_divi, wp_set_divi,
-wp_clear_cache, wp_get_settings, wp_update_settings, wp_acf_list, wp_acf_save_post_type,
-wp_acf_save_taxonomy, wp_acf_save_field_group, wp_acf_delete, wp_acf_get_values,
-wp_acf_set_values.
+wp_update_content, wp_get_elementor, wp_edit_elementor_text, wp_upload_media, wp_list_media,
+wp_list_terms, wp_create_term, wp_list_history.
 
-With WooCommerce active, 19 more are offered: wp_woo_overview, wp_woo_list_products,
-wp_woo_get_product, wp_woo_list_config, wp_woo_sales_summary, wp_woo_list_orders,
-wp_woo_get_order, wp_woo_list_customers, wp_woo_save_product, wp_woo_save_variation,
-wp_woo_bulk_update, wp_woo_save_category, wp_woo_save_coupon, wp_woo_create_order,
-wp_woo_update_order, wp_woo_save_attribute, wp_woo_update_settings, wp_woo_refund_order,
-wp_woo_delete. Sites without WooCommerce see exactly the tools they always did.
+Free works with the post and page post types and the category and post_tag taxonomies. Other
+post types and taxonomies are part of Pro. wp_create_content and wp_update_content do not accept
+Elementor layouts (Plus) or ACF values (Pro) on Free; they are refused before anything is saved.
 
-== WooCommerce ==
+== Elementor text editing ==
 
-Everything goes through WooCommerce's own product, order, coupon and attribute functions, so
-stock, prices, lookup tables, caches and order rules behave as they do in the WooCommerce admin.
-WP MCP never writes WooCommerce's tables directly, and it declares itself compatible with
-High-Performance Order Storage.
-
-Products: wp_woo_save_product creates and updates simple, variable, grouped and external products
-(name, descriptions, SKU, prices and sale dates, stock, tax, size and weight, shipping class,
-categories, tags, images, attributes, downloads, linked products, custom fields). wp_woo_save_variation
-adds and edits variations of a variable product, and wp_woo_bulk_update changes prices and stock for
-up to 100 products or variations at once. wp_woo_save_category, wp_woo_save_coupon and
-wp_woo_save_attribute manage categories, coupons and global attributes.
-
-Orders: wp_woo_create_order, wp_woo_update_order (status, addresses, notes), wp_woo_refund_order,
-wp_woo_list_orders, wp_woo_get_order, wp_woo_list_customers and wp_woo_sales_summary. Changing an order
-status can make WooCommerce email the customer, exactly as it does for a store manager; a refund only
-records the refund unless refund_payment is true, in which case the payment gateway returns the money.
-
-Reading the store: wp_woo_overview (version, currency, counts, settings) and wp_woo_list_config
-(attributes, categories, shipping zones and classes, payment gateways without keys, tax rates, order
-statuses, coupons). Shipping zones, payment gateways and tax rates are read-only here on purpose.
-wp_woo_update_settings changes a short allowlist of store settings (address, currency and price format,
-taxes, coupons, stock thresholds, guest checkout, reviews, units). Gateway keys, emails and URLs cannot
-be changed.
-
-Everything is checked before anything is saved. Changes are in the history and can be rolled back,
-except refunds, permanent deletes and deleting an attribute. wp_create_content, wp_update_content and
-wp_delete_content refuse products, orders and coupons while WooCommerce is active, so they cannot skip
-WooCommerce's rules. Orders and customers hold personal details, so reading them needs Read and edit.
-Refunds, deletes, store settings and global attributes need Full access.
-
-== Advanced Custom Fields ==
-
-Works with the free ACF plugin (6.1 or newer for post types and taxonomies) and ACF Pro. Everything
-goes through ACF's own functions, so ACF registers post types and taxonomies itself and keeps its
-field references correct.
-
-wp_acf_list reads field groups (and their fields), ACF post types, taxonomies, options pages (Pro)
-and the field types available. wp_acf_save_post_type and wp_acf_save_taxonomy create or update
-custom post types and taxonomies from a slug, singular and plural names and a small set of
-checked settings; WordPress's reserved names and names owned by another plugin are refused.
-wp_acf_save_field_group creates or updates a field group and its fields from a plain description
-(repeater, flexible content, gallery and clone need ACF Pro and are refused on the free plugin).
-wp_acf_get_values and wp_acf_set_values read and write field values for posts, options pages,
-users and terms, and wp_create_content and wp_update_content accept an "acf" object. Setting a
-value that no ACF field defines is refused rather than saved as loose meta. Every change is in
-the history and can be rolled back. Creating or deleting post types, taxonomies and field groups
-needs Full access; setting values needs Read and edit; reading needs Read only.
+wp_get_elementor reads a layout (summary=true for an outline, index=N for one section) and
+wp_edit_elementor_text changes the words in it. Give edits, a list of {id, field, value}, where id
+is an element id from wp_get_elementor and field is a text setting (title, editor, text, button
+labels, list items such as icon_list.0.text), or replace, a list of {find, replace} applied to every
+text field on the page. Only text can change. Before saving, the page is compared with the original
+with all text blanked, and nothing is saved unless the structure is identical, so layout, styles and
+widgets cannot be touched. Changes are recorded in the history. Full layout editing is Plus.
 
 == Access levels ==
 
 Each connected app has an access level, chosen when you approve it and changeable later in
 Connected apps:
 
-    Read only      look at content, layouts, settings and history; change nothing (14 tools, 19 with WooCommerce)
-    Read and edit  also create and edit content, layouts and media, clear caches and undo (24 tools, 39 with WooCommerce)
-    Full access    everything that is switched on, including delete, settings and plugin tools (all)
+    Read only      look at content, layouts and history; change nothing (8 tools in Free)
+    Read and edit  also create and edit content and media and change Elementor text (13 tools in Free)
+    Full access    everything the plan includes and that is switched on
 
-Approval defaults to Read and edit. An app is only offered the tools its level allows, and a
-refused call explains which level is needed. Undoing a change needs the level that could have
-made it. The API key has its own level under Security; it stays at Full access unless you lower
-it, and connections made before levels existed keep Full access. A tool that has not been
-placed in a level is available at Full access only.
+Approval defaults to Read and edit. An app is only offered the tools its level and the site's plan
+allow, and a refused call explains what is needed. The API key has its own level under Security; it
+stays at Full access unless you lower it, and connections made before levels existed keep Full
+access. A tool that has not been placed in a level is available at Full access only.
 
-== Page builders, cache and settings ==
+== Change history ==
 
-wp_ping reports each page's editor ("builder": gutenberg, elementor, divi or classic), the
-Divi version and generation, and which cache plugins were found. Use the tools that match
-the builder and do not mix editors on one page.
-
-Gutenberg: wp_get_blocks (summary, then one block by index) and wp_set_blocks write block
-markup (replace, append, prepend, insert, replace_block). Every block comment must be closed
-in order and its attributes must be valid JSON, otherwise nothing is saved. Unregistered blocks
-are reported as warnings. wp_list_block_types shows what is available.
-
-Divi 4: wp_get_divi and wp_set_divi read and write shortcode layouts section by section. Nesting
-is checked, the Divi Builder is switched on for the page and Divi's cached CSS is cleared.
-Divi 5 stores layouts as blocks, so use the Gutenberg tools there.
-
-wp_clear_cache clears the object cache, expired transients, Elementor CSS, Divi static
-resources and the page cache plugin if present (LiteSpeed, WP Rocket, W3 Total Cache, WP Super
-Cache, WP Fastest Cache, Autoptimize, SiteGround, Cache Enabler, Breeze, Hummingbird, Nginx
-Helper). CDN and host-level caches are outside WordPress.
-
-wp_get_settings and wp_update_settings cover title, tagline, timezone, date and time format,
-posts per page, homepage and posts page, search engine visibility, comment defaults and the
-permalink structure. Values are validated together, previous values are saved for rollback,
-and URLs, the admin email, registration and roles cannot be changed.
-
-wp_set_extension_active activates or deactivates a plugin or switches the theme. It is off
-until you turn on Allow activation, and WP MCP cannot deactivate itself.
+Every write made through WP MCP is recorded (the connected app or API key, what changed, when) in
+the History tab, and wp_list_history lists it. Rolling a change back, from the screen or with
+wp_rollback, is part of Pro. The latest 300 changes are kept for 90 days.
 
 With an API key the requests run without a WordPress user, so WordPress may filter some HTML
 (for example scripts or iframes) from content. Connecting through OAuth runs them as the
 administrator who approved the app.
 
-== Change history and rollback ==
+== Updates and privacy ==
 
-Every write made through WP MCP is recorded (the connected app or API key, what
-changed, when) in the History tab, with what is needed to undo it: content and
-meta fields, terms, featured image and Elementor layout are restored from a
-snapshot of only what the call touched; created items are trashed; deleted items
-are restored (permanent deletes come back with the same ID); uploads and terms
-are removed; file edits restore their pre-edit snapshot. If an item was edited
-after the change, rollback asks for confirmation before overwriting those edits.
-The latest 300 changes are kept for 90 days. AI apps can use wp_list_history
-and wp_rollback. Plugin and theme installs are recorded but cannot be undone.
-
-== File safety and recovery (2.3.0) ==
-
-PHP edits are parsed without execution on the server's PHP version before
-writing. Missing or escaped opening tags, BOMs and new non-whitespace text
-outside PHP in previously PHP-only files are rejected. functions.php must
-remain PHP-only. Existing mixed HTML/PHP templates remain supported.
-JSON edits must parse. These checks do not detect every runtime or logic error.
-
-Use dry_run=true on wp_edit_extension_file before applying an edit. Every
-write is checked again, then saves the old contents to a non-autoloaded
-database option. If the snapshot cannot be saved, the write is refused.
-Ten snapshots are retained per file. They can contain sensitive source, are
-not placed in a public uploads folder, and are included in database backups.
-Storage grows with the number of distinct files edited.
-
-wp_list_file_backups takes kind, extension, file and lists snapshot metadata.
-wp_restore_extension_file takes kind, extension, file, backup_id and the
-expected_sha256 of the current file. It applies the same permissions and
-validation as editing and snapshots the current file before restoring.
-These tools require WordPress, the database and the MCP endpoint to work.
-They cannot resurrect a failed WordPress bootstrap or repair hosting outages.
-Snapshots cover only edits made through this version, not earlier changes.
-
-Read -> dry run -> edit one file -> wp_ping -> inspect affected page.
-If responses become malformed or unavailable, stop editing and restore the
-last changed file using a known-good hosting backup via file manager/SFTP.
-WordPress Recovery Mode may help regain admin access after a fatal error.
-Do not blindly decode HTML entities across an entire file.
-Keep independent hosting backups and a staging site for runtime testing.
-No hosting access, standalone rescue endpoint, or full-site backup is provided.
-
-== Plugin and theme access ==
-
-Version 2.2.0 adds opt-in extension tools. Existing content access is unchanged.
-Save extension permissions in the WP MCP admin menu as an administrator. The key
-delegates these operations to that administrator; permissions are rechecked
-on every call. Installation and editing have separate switches, off by default.
-HTTPS and header authentication are mandatory for all extension tools.
-Multisite is not supported. WordPress file modification restrictions apply.
-
-Use kind="plugin" or kind="theme". List installed extensions to get identifiers.
-Install using a WordPress.org slug. Custom ZIP URLs, activation, updates,
-deletion, and creating new source files are not supported in this release.
-Installed extensions remain inactive.
-
-List files, then read a file to obtain its sha256. Pass that value as
-expected_sha256 with the replacement content when editing. Files are limited
-to 100 KB. Existing WordPress editor rules and PHP loopback error checks apply;
-these are not a substitute for backups or staging, especially for inactive code.
-Remote installation requires direct filesystem access.
-
-Call wp_ping first. It reports the Elementor version and editor generation
-(v3-classic vs v4-atomic), which decides the JSON shape wp_set_elementor needs.
-
-== Working with big Elementor pages ==
-
-A single builder page often exceeds a client's tool-result cap (~150,000 chars
-on Claude.ai / Desktop). Read a layout in stages:
-
-    wp_get_elementor { id }                    -> whole tree
-    wp_get_elementor { id, summary: true }     -> outline only (auto-depth)
-    wp_get_elementor { id, index: 3 }          -> one top-level section, in full
-    wp_get_elementor { id, depth: 2 }          -> tree cut off below level 2
-    wp_get_content   { ..., include_elementor: false }
-
-Write it back in pieces instead of resending the whole tree. Make the first
-array item a marker:
-
-    [{"elType":"__append__"}, ...]                  append after the last section
-    [{"elType":"__replace__","index":3}, ...]       swap top-level section 3
-    [{"elType":"__insert__","index":0}, ...]        insert before section 0
-
-With no marker, "elements" replaces the entire layout (v1.x behaviour).
-wp_set_elementor also accepts "page_settings" for _elementor_page_settings, on
-its own or alongside elements.
+WP MCP gets its updates from its own update server, updates.wpmcp.co, not from WordPress.org. WordPress asks it
+for the latest version about twice a day. The request carries no site address, no key and no user data, only
+what any web request carries (your server's IP address). Nothing else is sent anywhere. Add WPMCP_UPDATE_URL to
+wp-config.php to point a site at a different update server.
 
 == Fonts ==
 
@@ -251,6 +114,13 @@ The admin screen bundles the Inter typeface (SIL Open Font License 1.1, see
 assets/fonts/Inter-LICENSE.txt). Nothing is loaded from external servers.
 
 == Changelog ==
+
+= 3.0.0 =
+* WP MCP is now Free plus an optional WP MCP Pro add-on. Free covers the connection, posts and pages, media, categories and tags, and reading and changing text on Elementor pages. Plus and Pro, from the add-on, add page builders, WooCommerce, ACF and more.
+* New: wp_edit_elementor_text changes words on an Elementor page and cannot touch its layout.
+* New Plan tab shows what each plan includes. Tools a plan does not include are marked on the Tools tab, are not offered to apps, and are refused with an explanation.
+* Updates now come from WP MCP's own update server instead of GitHub. See Updates and privacy.
+* Moved to the add-on: WooCommerce, ACF, Divi, block editor tools, cache clearing, site settings, delete, undo and plugin and theme tools. See Upgrading to 3.0.0.
 
 = 2.13.0 =
 * WooCommerce support: manage products (simple, variable, grouped and external), variations, categories, coupons and global attributes, update prices and stock in bulk, create and update orders, refund, and read sales, customers and store setup. 19 new tools, offered only while WooCommerce is active.

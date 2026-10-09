@@ -278,6 +278,7 @@ class WPMCP_History {
 	 * @return array|WP_Error {message}
 	 */
 	public static function rollback( $id, $force = false, $files = false, $level = 'full' ) {
+		if ( ! WPMCP_Plans::at_least( 'pro' ) ) { return new WP_Error( 'wpmcp_plan', WPMCP_Plans::upgrade_text( 'pro', 'Rolling back a change' ) ); }
 		$row  = self::get( $id );
 		$why  = self::blocker( $row );
 		if ( '' !== $why ) { return new WP_Error( 'wpmcp_no_rollback', $why ); }
@@ -305,44 +306,11 @@ class WPMCP_History {
 		} elseif ( 'delete_term' === $op ) {
 			$deleted = wp_delete_term( (int) $data['term_id'], $data['taxonomy'] );
 			$result  = true === $deleted ? true : new WP_Error( 'wpmcp_failed', 'Could not delete the term.' );
-		} elseif ( 'acf_delete' === $op ) {
-			$result = WPMCP_ACF::undo_create( $data['kind'], $data['key'] );
-		} elseif ( 'acf_restore' === $op ) {
-			$result = WPMCP_ACF::restore( $data['kind'], $data['data'] );
-		} elseif ( 'acf_values' === $op ) {
-			$result = WPMCP_ACF::restore_values( $data, $row['after_hash'], $force );
-		} elseif ( 'woo_props' === $op ) {
-			$result = WPMCP_Woo::restore_props( $data['id'], $data['state'], $row['after_hash'], $force, isset( $data['keys'] ) ? $data['keys'] : null );
-		} elseif ( 'woo_bulk' === $op ) {
-			$result = WPMCP_Woo::restore_bulk( $data['items'], $row['after_hash'], $force );
-		} elseif ( 'woo_coupon' === $op ) {
-			$result = WPMCP_Woo::restore_coupon( $data['id'], $data['state'], $row['after_hash'], $force );
-		} elseif ( 'woo_order' === $op ) {
-			$result = WPMCP_Woo::restore_order( $data['id'], $data['state'], $data['keys'], $data['notes'], $row['after_hash'], $force );
-		} elseif ( 'woo_trash_created' === $op ) {
-			$result = WPMCP_Woo::undo_create( $post_id );
-		} elseif ( 'woo_untrash' === $op ) {
-			$result = WPMCP_Woo::untrash( $data['id'], isset( $data['children'] ) ? $data['children'] : array() );
-		} elseif ( 'woo_term' === $op ) {
-			$result = WPMCP_Woo::restore_term( $data['id'], $data['before'] );
-		} elseif ( 'woo_term_recreate' === $op ) {
-			$result = WPMCP_Woo::recreate_term( $data['before'] );
-		} elseif ( 'woo_attribute' === $op ) {
-			$result = WPMCP_Woo::restore_attribute( $data['id'], $data['before'] );
-		} elseif ( 'woo_attribute_delete' === $op ) {
-			$result = WPMCP_Woo::undo_attribute_create( $data['id'] );
-		} elseif ( 'woo_options' === $op ) {
-			$result = WPMCP_Woo::restore_options( $data['values'] );
-		} elseif ( 'restore_options' === $op ) {
-			$result = WPMCP_Site::restore_options( $data['values'] );
-		} elseif ( 'set_active' === $op ) {
-			if ( ! $files ) { return new WP_Error( 'wpmcp_use_admin', 'Plugin and theme activation is rolled back from the WP MCP History screen.' ); }
-			$result = WPMCP_Extensions::admin_set_active( $data['kind'], $data['extension'], ! empty( $data['active'] ) );
-		} elseif ( 'file' === $op ) {
-			if ( ! $files ) { return new WP_Error( 'wpmcp_use_file_tool', 'File edits are rolled back from the WP MCP History screen, or with wp_restore_extension_file using backup_id ' . $data['backup_id'] . '.' ); }
-			$result = WPMCP_Extensions::admin_restore( $data['kind'], $data['extension'], $data['file'], $data['backup_id'] );
 		} else {
-			return new WP_Error( 'wpmcp_no_rollback', 'This kind of change cannot be rolled back.' );
+			$result = apply_filters( 'wpmcp_rollback_op', null, $op, $data, $row, array( 'force' => $force, 'files' => $files, 'post_id' => $post_id ) );
+			if ( null === $result ) {
+				return new WP_Error( 'wpmcp_no_rollback', 'This kind of change cannot be rolled back.' );
+			}
 		}
 		if ( is_wp_error( $result ) ) { return $result; }
 
