@@ -3,7 +3,7 @@ Author: Saifullah Qadeer
 Requires at least: 5.6
 Requires PHP: 7.4
 Tested with Elementor: 4.x
-Stable tag: 3.0.0
+Stable tag: 3.0.1
 License: GPL-2.0-or-later
 
 Turns a WordPress site into its own remote MCP server, so Claude (web, Desktop,
@@ -114,6 +114,9 @@ The admin screen bundles the Inter typeface (SIL Open Font License 1.1, see
 assets/fonts/Inter-LICENSE.txt). Nothing is loaded from external servers.
 
 == Changelog ==
+
+= 3.0.1 =
+* The plugin is now named wpmcp: folder wpmcp and main file wpmcp.php (it was wp-mcp), and the WP MCP admin page address is now ?page=wpmcp. WordPress sees this as a different plugin, so a site on 3.0.0 does not update by itself: deactivate and delete the old WP MCP, then upload and activate this version. Settings, API key and connected apps are kept, because they live in the database and deleting the plugin does not remove them.
 
 = 3.0.0 =
 * WP MCP is now Free plus an optional WP MCP Pro add-on. Free covers the connection, posts and pages, media, categories and tags, and reading and changing text on Elementor pages. Plus and Pro, from the add-on, add page builders, WooCommerce, ACF and more.

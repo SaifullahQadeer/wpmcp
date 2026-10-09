@@ -334,7 +334,7 @@ class WPMCP_OAuth {
 
 	/** Page frame: brand header, then the card. Close with </div>. */
 	private static function authorize_open() {
-		echo '<div class="wrap wpmcp wpmcp-consent"><header class="wpmcp-header"><div class="wpmcp-brand"><img class="wpmcp-logo" src="' . esc_url( WPMCP_PLUGIN_URL . 'assets/brand/wp-mcp-icon.png' ) . '" width="254" height="36" alt="" /><div><h1>Connect an AI app</h1><p>' . esc_html( get_bloginfo( 'name' ) ) . '</p></div></div></header>';
+		echo '<div class="wrap wpmcp wpmcp-consent"><header class="wpmcp-header"><div class="wpmcp-brand"><img class="wpmcp-logo" src="' . esc_url( WPMCP_PLUGIN_URL . 'assets/brand/wpmcp-icon.png' ) . '" width="254" height="36" alt="" /><div><h1>Connect an AI app</h1><p>' . esc_html( get_bloginfo( 'name' ) ) . '</p></div></div></header>';
 	}
 
 	private static function authorize_notice( $type, $html ) {

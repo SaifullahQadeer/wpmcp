@@ -2,7 +2,7 @@
 @font-face{font-family:Inter;font-style:normal;font-weight:500;font-display:swap;src:url(fonts/inter-latin-500-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
 @font-face{font-family:Inter;font-style:normal;font-weight:600;font-display:swap;src:url(fonts/inter-latin-600-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
 @font-face{font-family:Inter;font-style:normal;font-weight:700;font-display:swap;src:url(fonts/inter-latin-700-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
-body.toplevel_page_wp-mcp,body.admin_page_wpmcp-authorize{background:#faf8f5}
+body.toplevel_page_wpmcp,body.admin_page_wpmcp-authorize{background:#faf8f5}
 .wpmcp{--ink:#14161a;--muted:#5d646d;--line:#e8e3da;--bg:#faf8f5;--soft:#f3efe8;--card:#fff;--accent:#ee4d2b;--accent-dark:#d63f1f;--accent-soft:#fdece7;--ok:#0f7a3d;--ok-soft:#e5f4ea;--warn:#a15c00;--warn-soft:#fdf2dc;--danger:#b32d2e;--danger-soft:#fbe6e6;max-width:1220px;margin:24px 20px 0 2px;color:var(--ink);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;font-size:14px;font-weight:400;line-height:1.55;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
 .wpmcp button,.wpmcp input,.wpmcp select,.wpmcp textarea,.wpmcp a.button{font-family:inherit}
 .wpmcp h1,.wpmcp h2,.wpmcp h3{font-family:inherit}
@@ -164,7 +164,7 @@ html{scroll-behavior:smooth}
 @media(max-width:640px){.wpmcp{margin:16px 10px}.wpmcp-header{flex-direction:column;align-items:flex-start}.wpmcp-header-side{justify-content:flex-start}.wpmcp-panel{padding:20px}.wpmcp-side{grid-template-columns:minmax(0,1fr)}.wpmcp-copy{flex-wrap:wrap}.wpmcp-copy input{flex-basis:100%}.wpmcp-save{flex-direction:column;align-items:flex-start}.wpmcp-kv th{width:110px}}
 
 /* Notices from other plugins stay off this screen; ours carry .wpmcp-notice */
-body.toplevel_page_wp-mcp #wpbody-content .notice:not(.wpmcp-notice),body.toplevel_page_wp-mcp #wpbody-content div.updated:not(.wpmcp-notice),body.toplevel_page_wp-mcp #wpbody-content div.error:not(.wpmcp-notice),body.toplevel_page_wp-mcp #wpbody-content .update-nag,body.admin_page_wpmcp-authorize #wpbody-content .notice:not(.wpmcp-notice),body.admin_page_wpmcp-authorize #wpbody-content div.updated:not(.wpmcp-notice),body.admin_page_wpmcp-authorize #wpbody-content div.error:not(.wpmcp-notice),body.admin_page_wpmcp-authorize #wpbody-content .update-nag{display:none!important}
+body.toplevel_page_wpmcp #wpbody-content .notice:not(.wpmcp-notice),body.toplevel_page_wpmcp #wpbody-content div.updated:not(.wpmcp-notice),body.toplevel_page_wpmcp #wpbody-content div.error:not(.wpmcp-notice),body.toplevel_page_wpmcp #wpbody-content .update-nag,body.admin_page_wpmcp-authorize #wpbody-content .notice:not(.wpmcp-notice),body.admin_page_wpmcp-authorize #wpbody-content div.updated:not(.wpmcp-notice),body.admin_page_wpmcp-authorize #wpbody-content div.error:not(.wpmcp-notice),body.admin_page_wpmcp-authorize #wpbody-content .update-nag{display:none!important}
 .wpmcp .wpmcp-notice{margin:0 0 16px;background:var(--card);border:1px solid var(--line);border-left-width:4px;box-shadow:none}
 
 /* Chevron on collapsible sections */

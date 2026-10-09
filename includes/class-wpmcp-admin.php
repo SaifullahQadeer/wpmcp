@@ -42,20 +42,20 @@ class WPMCP_Admin {
 	/** Other plugins' notices do not belong on this screen. */
 	public function suppress_notices() {
 		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
-		if ( ! $screen || 'toplevel_page_wp-mcp' !== $screen->id ) { return; }
+		if ( ! $screen || 'toplevel_page_wpmcp' !== $screen->id ) { return; }
 		foreach ( array( 'admin_notices', 'all_admin_notices', 'user_admin_notices', 'network_admin_notices' ) as $hook ) { remove_all_actions( $hook ); }
 	}
-	public function add_menu() { add_menu_page( 'WP MCP', 'WP MCP', 'manage_options', 'wp-mcp', array( $this, 'render_page' ), 'dashicons-rest-api', 80 ); }
+	public function add_menu() { add_menu_page( 'WP MCP', 'WP MCP', 'manage_options', 'wpmcp', array( $this, 'render_page' ), 'dashicons-rest-api', 80 ); }
 	/** Put a Settings link before Deactivate on the Plugins screen. */
 	public function action_links( $links ) {
 		if ( ! current_user_can( 'manage_options' ) ) { return $links; }
 		$check = current_user_can( 'update_plugins' ) ? '<a href="' . esc_url( wp_nonce_url( admin_url( 'plugins.php?wpmcp_check_update=1' ), 'wpmcp_check_update' ) ) . '">Check for updates</a>' : '';
-		array_unshift( $links, '<a href="' . esc_url( admin_url( 'admin.php?page=wp-mcp' ) ) . '">Settings</a>' );
+		array_unshift( $links, '<a href="' . esc_url( admin_url( 'admin.php?page=wpmcp' ) ) . '">Settings</a>' );
 		if ( $check ) { array_splice( $links, 1, 0, $check ); }
 		return $links;
 	}
 	public function assets( $hook ) {
-		if ( 'toplevel_page_wp-mcp' !== $hook ) { return; }
+		if ( 'toplevel_page_wpmcp' !== $hook ) { return; }
 		wp_enqueue_style( 'wpmcp-admin', WPMCP_PLUGIN_URL . 'assets/admin.css', array(), WPMCP_VERSION );
 		wp_enqueue_script( 'wpmcp-admin', WPMCP_PLUGIN_URL . 'assets/admin.js', array(), WPMCP_VERSION, true );
 	}
@@ -68,7 +68,7 @@ class WPMCP_Admin {
 		return array( 'connect' => 'Connect', 'tools' => 'Tools', 'history' => 'History', 'security' => 'Security', 'plan' => 'Plan', 'system' => 'System' );
 	}
 	private function tab_url( $tab ) {
-		return add_query_arg( array( 'page' => 'wp-mcp', 'tab' => $tab ), admin_url( 'admin.php' ) );
+		return add_query_arg( array( 'page' => 'wpmcp', 'tab' => $tab ), admin_url( 'admin.php' ) );
 	}
 	private function current_tab() {
 		$tab = isset( $_GET['tab'] ) ? sanitize_key( wp_unslash( $_GET['tab'] ) ) : 'connect';
@@ -413,7 +413,7 @@ class WPMCP_Admin {
 	private function render_system( $url ) {
 		$env      = WPMCP_Elementor::environment();
 		$new      = ( new WPMCP_Updater() )->cached_update();
-		$check    = wp_nonce_url( admin_url( 'admin.php?page=wp-mcp&wpmcp_check_update=1&wpmcp_return=1' ), 'wpmcp_check_update' );
+		$check    = wp_nonce_url( admin_url( 'admin.php?page=wpmcp&wpmcp_check_update=1&wpmcp_return=1' ), 'wpmcp_check_update' );
 		$meta     = WPMCP_OAuth::server_metadata();
 		$this->render_health();
 		?>
@@ -669,7 +669,7 @@ class WPMCP_Admin {
 		$icons   = array( 'connect' => 'connect', 'tools' => 'tools', 'history' => 'history', 'security' => 'shield', 'plan' => 'sparkles', 'system' => 'system' );
 		?>
 		<div class="wrap wpmcp">
-		<header class="wpmcp-header"><div class="wpmcp-brand"><img class="wpmcp-logo" src="<?php echo esc_url( WPMCP_PLUGIN_URL . 'assets/brand/wp-mcp-icon.png' ); ?>" width="254" height="36" alt="" /><div><h1>WP MCP <span>v<?php echo esc_html( WPMCP_VERSION ); ?></span></h1><p>Let AI apps manage your WordPress site, with you in control.</p></div></div>
+		<header class="wpmcp-header"><div class="wpmcp-brand"><img class="wpmcp-logo" src="<?php echo esc_url( WPMCP_PLUGIN_URL . 'assets/brand/wpmcp-icon.png' ); ?>" width="254" height="36" alt="" /><div><h1>WP MCP <span>v<?php echo esc_html( WPMCP_VERSION ); ?></span></h1><p>Let AI apps manage your WordPress site, with you in control.</p></div></div>
 		<div class="wpmcp-header-side"><?php if ( $new ) : ?><a class="wpmcp-pill wpmcp-pill-warn" href="<?php echo esc_url( $this->tab_url( 'system' ) ); ?>">Update available: <?php echo esc_html( $new ); ?></a><?php endif; ?></div></header>
 		<nav class="wpmcp-tabs" aria-label="WP MCP sections"><?php foreach ( $this->tabs() as $id => $label ) : ?><a href="<?php echo esc_url( $this->tab_url( $id ) ); ?>"<?php echo $id === $tab ? ' class="is-active" aria-current="page"' : ''; ?>><?php echo $this->icon( $icons[ $id ], 17 ); // phpcs:ignore WordPress.Security.EscapeOutput ?><?php echo esc_html( $label ); ?></a><?php endforeach; ?></nav>
 		<?php echo $this->update_notice_markup(); // phpcs:ignore WordPress.Security.EscapeOutput -- escaped inside. ?>

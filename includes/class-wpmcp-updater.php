@@ -8,7 +8,7 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 class WPMCP_Updater {
 	const SERVER = 'https://updates.wpmcp.co';
-	const SLUG   = 'wp-mcp';
+	const SLUG   = 'wpmcp';
 	const CACHE  = 'wpmcp_update_release';
 
 	private $basename;

@@ -324,7 +324,7 @@ class WPMCP_MCP {
 
 	private function server_info() {
 		return array(
-			'name'        => 'wp-mcp',
+			'name'        => 'wpmcp',
 			'title'       => 'WordPress: ' . get_bloginfo( 'name' ),
 			'version'     => WPMCP_VERSION,
 			'description' => 'Manage pages, posts, media, taxonomies and Elementor layouts on ' . home_url() . '.',
