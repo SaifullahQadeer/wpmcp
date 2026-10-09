@@ -3,7 +3,7 @@ Author: Saifullah Qadeer
 Requires at least: 5.6
 Requires PHP: 7.4
 Tested with Elementor: 4.x
-Stable tag: 2.12.1
+Stable tag: 2.12.2
 License: GPL-2.0-or-later
 
 Turns a WordPress site into its own remote MCP server, so Claude (web, Desktop,
@@ -212,6 +212,9 @@ The admin screen bundles the Inter typeface (SIL Open Font License 1.1, see
 assets/fonts/Inter-LICENSE.txt). Nothing is loaded from external servers.
 
 == Changelog ==
+
+= 2.12.2 =
+* The approve screen for connecting an AI app now matches the rest of WP MCP: brand header, a clear card, access levels as selectable cards, and the same buttons. Other plugins' notices no longer appear on it.
 
 = 2.12.1 =
 * Sign-in discovery and token responses are now marked uncacheable for LiteSpeed and other page caches. LiteSpeed had been keeping the discovery data for a week, which could leave a connector with stale sign-in details.

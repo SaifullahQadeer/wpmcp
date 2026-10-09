@@ -526,7 +526,7 @@ class WPMCP_Admin {
 	/* ----------------------------------------------------------------- */
 
 	/** Inline SVG icon (stroke style, inherits the text colour). */
-	private function icon( $name, $size = 20 ) {
+	public function icon( $name, $size = 20 ) {
 		static $paths = null;
 		if ( null === $paths ) {
 			$paths = array(

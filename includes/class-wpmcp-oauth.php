@@ -28,6 +28,8 @@ class WPMCP_OAuth {
 		add_action( 'init', array( __CLASS__, 'serve_well_known' ), 0 );
 		add_action( 'admin_menu', array( __CLASS__, 'add_authorize_page' ) );
 		add_action( 'admin_init', array( __CLASS__, 'handle_decision' ) );
+		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'authorize_assets' ) );
+		add_action( 'in_admin_header', array( __CLASS__, 'authorize_suppress_notices' ), 1000 );
 	}
 
 	/** On unless disabled, and only on HTTPS sites because tokens travel in headers. */
@@ -226,6 +228,19 @@ class WPMCP_OAuth {
 		add_submenu_page( 'options.php', 'Authorize connection', 'Authorize connection', 'manage_options', self::PAGE, array( __CLASS__, 'render_authorize' ) );
 	}
 
+	/** The approval page uses the same stylesheet as the WP MCP screen. */
+	public static function authorize_assets( $hook ) {
+		if ( 'admin_page_' . self::PAGE !== $hook ) { return; }
+		wp_enqueue_style( 'wpmcp-admin', WPMCP_PLUGIN_URL . 'assets/admin.css', array(), WPMCP_VERSION );
+	}
+
+	/** Other plugins' notices do not belong on the approval page. */
+	public static function authorize_suppress_notices() {
+		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+		if ( ! $screen || 'admin_page_' . self::PAGE !== $screen->id ) { return; }
+		foreach ( array( 'admin_notices', 'all_admin_notices', 'user_admin_notices', 'network_admin_notices' ) as $hook ) { remove_all_actions( $hook ); }
+	}
+
 	/**
 	 * Validate an authorization request. A bad client_id or redirect_uri is never
 	 * redirected to: the result has no redirect_uri so the page shows the error.
@@ -317,37 +332,59 @@ class WPMCP_OAuth {
 		exit;
 	}
 
+	/** Page frame: brand header, then the card. Close with </div>. */
+	private static function authorize_open() {
+		echo '<div class="wrap wpmcp wpmcp-consent"><header class="wpmcp-header"><div class="wpmcp-brand"><img class="wpmcp-logo" src="' . esc_url( WPMCP_PLUGIN_URL . 'assets/brand/wp-mcp-icon.png' ) . '" width="254" height="36" alt="" /><div><h1>Connect an AI app</h1><p>' . esc_html( get_bloginfo( 'name' ) ) . '</p></div></div></header>';
+	}
+
+	private static function authorize_notice( $type, $html ) {
+		echo '<div class="notice inline wpmcp-notice notice-' . esc_attr( $type ) . '"><p>' . $html . '</p></div>'; // phpcs:ignore WordPress.Security.EscapeOutput -- callers pass escaped markup.
+	}
+
 	public static function render_authorize() {
 		if ( ! current_user_can( 'manage_options' ) ) { return; }
 		$checked = self::check_authorize_params( wp_unslash( $_GET ) );
-		echo '<div class="wrap"><h1>Connect an AI app to ' . esc_html( get_bloginfo( 'name' ) ) . '</h1>';
-		if ( ! self::enabled() ) { echo '<div class="notice notice-error"><p>OAuth sign-in is turned off for this site.</p></div></div>'; return; }
-		if ( isset( $checked['fatal'] ) ) { echo '<div class="notice notice-error"><p>' . esc_html( $checked['fatal'] ) . '</p></div></div>'; return; }
+		$ui      = new WPMCP_Admin();
+		self::authorize_open();
+		if ( ! self::enabled() ) { self::authorize_notice( 'error', 'OAuth sign-in is turned off for this site.' ); echo '</div>'; return; }
+		if ( isset( $checked['fatal'] ) ) { self::authorize_notice( 'error', esc_html( $checked['fatal'] ) ); echo '</div>'; return; }
 		if ( isset( $checked['error'] ) ) {
-			echo '<div class="notice notice-error"><p>' . esc_html( $checked['message'] ) . '</p></div><p><a class="button" href="' . esc_url( self::redirect_with( $checked['redirect_uri'], array( 'error' => $checked['error'], 'state' => $checked['state'] ) ) ) . '">Return to the app</a></p></div>';
+			self::authorize_notice( 'error', esc_html( $checked['message'] ) );
+			echo '<p><a class="button" href="' . esc_url( self::redirect_with( $checked['redirect_uri'], array( 'error' => $checked['error'], 'state' => $checked['state'] ) ) ) . '">Return to the app</a></p></div>';
 			return;
 		}
 		$user    = wp_get_current_user();
 		$request = self::create_auth_request( $checked, $user->ID );
 		$host    = wp_parse_url( $checked['redirect_uri'], PHP_URL_HOST );
+		$icons   = array( 'read' => 'eye', 'edit' => 'tools', 'full' => 'key' );
 		?>
-		<div class="card" style="max-width:560px;padding:1.5em 2em">
-			<p style="font-size:15px"><strong><?php echo esc_html( $checked['client']['name'] ); ?></strong> wants to connect to this site.</p>
-			<p>It will act as <strong><?php echo esc_html( $user->display_name ); ?></strong>. Choose what it may do. You can change this later in WP MCP.</p>
+		<section class="wpmcp-panel wpmcp-consent-card">
+			<div class="wpmcp-panel-head">
+				<h2><?php echo $ui->icon( 'connect' ); // phpcs:ignore WordPress.Security.EscapeOutput -- static icon map. ?><span><?php echo esc_html( $checked['client']['name'] ); ?> wants to connect</span></h2>
+				<p>It will act as <strong><?php echo esc_html( $user->display_name ); ?></strong>. You can change its access later in WP MCP.</p>
+			</div>
 			<?php if ( ! self::is_known_redirect( $checked['redirect_uri'] ) ) : ?>
-				<div class="notice notice-warning inline"><p><strong>Unrecognized app.</strong> It will send you to <code><?php echo esc_html( $host ? $host : $checked['redirect_uri'] ); ?></code>, which is not a well-known AI service. Anyone can register an app under any name, so approve only if you started this connection yourself.</p></div>
+				<div class="notice inline wpmcp-notice notice-warning"><p><strong>Unrecognized app.</strong> It will send you to <code><?php echo esc_html( $host ? $host : $checked['redirect_uri'] ); ?></code>, which is not a well-known AI service. Anyone can register an app under any name, so approve only if you started this connection yourself.</p></div>
 			<?php else : ?>
-				<p class="description">The app returns you to <code><?php echo esc_html( $host ? $host : wp_parse_url( $checked['redirect_uri'], PHP_URL_SCHEME ) . '://' ); ?></code>. The name above is chosen by the app itself. Only approve if you just started this connection.</p>
+				<p class="wpmcp-consent-note"><?php echo $ui->icon( 'shield', 16 ); // phpcs:ignore WordPress.Security.EscapeOutput -- static icon map. ?><span>The app returns you to <code><?php echo esc_html( $host ? $host : wp_parse_url( $checked['redirect_uri'], PHP_URL_SCHEME ) . '://' ); ?></code>. The name above is chosen by the app itself. Approve only if you just started this connection.</span></p>
 			<?php endif; ?>
 			<form method="post" action="<?php echo esc_url( add_query_arg( 'page', self::PAGE, admin_url( 'admin.php' ) ) ); ?>">
 				<?php wp_nonce_field( 'wpmcp_authorize' ); ?>
 				<input type="hidden" name="wpmcp_request" value="<?php echo esc_attr( $request ); ?>" />
-				<fieldset style="border:0;margin:16px 0 20px;padding:0"><legend style="font-weight:600;margin-bottom:8px">What may it do?</legend>
-				<?php foreach ( WPMCP_Permissions::levels() as $key => $info ) : ?><label style="display:block;margin:0 0 10px"><input type="radio" name="wpmcp_level" value="<?php echo esc_attr( $key ); ?>"<?php echo WPMCP_Permissions::DEFAULT_APP === $key ? ' checked' : ''; ?> /> <strong><?php echo esc_html( $info[0] ); ?></strong><br /><span class="description" style="margin-left:24px;display:block"><?php echo esc_html( $info[1] ); ?></span></label><?php endforeach; ?></fieldset>
-				<button class="button button-primary button-hero" name="wpmcp_decision" value="approve">Approve</button>
-				<button class="button button-hero" name="wpmcp_decision" value="deny">Cancel</button>
+				<fieldset class="wpmcp-levels"><legend>What may it do?</legend>
+				<?php foreach ( WPMCP_Permissions::levels() as $level_key => $info ) : ?>
+					<label class="wpmcp-level"><input type="radio" name="wpmcp_level" value="<?php echo esc_attr( $level_key ); ?>"<?php echo WPMCP_Permissions::DEFAULT_APP === $level_key ? ' checked' : ''; ?> />
+						<span class="wpmcp-level-icon"><?php echo $ui->icon( isset( $icons[ $level_key ] ) ? $icons[ $level_key ] : 'shield', 18 ); // phpcs:ignore WordPress.Security.EscapeOutput -- static icon map. ?></span>
+						<span class="wpmcp-level-text"><strong><?php echo esc_html( $info[0] ); ?></strong><small><?php echo esc_html( $info[1] ); ?></small></span>
+						<span class="wpmcp-level-dot" aria-hidden="true"></span></label>
+				<?php endforeach; ?>
+				</fieldset>
+				<div class="wpmcp-actions">
+					<button class="button button-primary button-hero" name="wpmcp_decision" value="approve">Approve</button>
+					<button class="button button-hero" name="wpmcp_decision" value="deny">Cancel</button>
+				</div>
 			</form>
-		</div></div>
+		</section></div>
 		<?php
 	}
 
