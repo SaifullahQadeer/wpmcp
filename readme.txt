@@ -3,12 +3,12 @@ Author: Saifullah Qadeer
 Requires at least: 5.6
 Requires PHP: 7.4
 Tested with Elementor: 4.x
-Stable tag: 2.12.2
+Stable tag: 2.13.0
 License: GPL-2.0-or-later
 
 Turns a WordPress site into its own remote MCP server, so Claude (web, Desktop,
 Cowork, Claude Code), Gemini or any MCP client can manage pages, posts, custom
-post types, media, taxonomies and Elementor layouts. No local software needed.
+post types, media, taxonomies, WooCommerce stores and Elementor layouts. No local software needed.
 
 == Upgrading to 2.1.0 ==
 
@@ -40,7 +40,7 @@ keys are not accepted.
 Requirements: the site must be on HTTPS, and permalinks must not be set to
 "Plain" (otherwise /wp-json/ 404s).
 
-== Tools (38) ==
+== Tools (38, and 19 more with WooCommerce) ==
 
 wp_ping, wp_list_post_types, wp_list_content, wp_get_content, wp_create_content,
 wp_update_content, wp_delete_content, wp_get_elementor, wp_set_elementor,
@@ -52,6 +52,45 @@ wp_list_block_types, wp_get_blocks, wp_set_blocks, wp_get_divi, wp_set_divi,
 wp_clear_cache, wp_get_settings, wp_update_settings, wp_acf_list, wp_acf_save_post_type,
 wp_acf_save_taxonomy, wp_acf_save_field_group, wp_acf_delete, wp_acf_get_values,
 wp_acf_set_values.
+
+With WooCommerce active, 19 more are offered: wp_woo_overview, wp_woo_list_products,
+wp_woo_get_product, wp_woo_list_config, wp_woo_sales_summary, wp_woo_list_orders,
+wp_woo_get_order, wp_woo_list_customers, wp_woo_save_product, wp_woo_save_variation,
+wp_woo_bulk_update, wp_woo_save_category, wp_woo_save_coupon, wp_woo_create_order,
+wp_woo_update_order, wp_woo_save_attribute, wp_woo_update_settings, wp_woo_refund_order,
+wp_woo_delete. Sites without WooCommerce see exactly the tools they always did.
+
+== WooCommerce ==
+
+Everything goes through WooCommerce's own product, order, coupon and attribute functions, so
+stock, prices, lookup tables, caches and order rules behave as they do in the WooCommerce admin.
+WP MCP never writes WooCommerce's tables directly, and it declares itself compatible with
+High-Performance Order Storage.
+
+Products: wp_woo_save_product creates and updates simple, variable, grouped and external products
+(name, descriptions, SKU, prices and sale dates, stock, tax, size and weight, shipping class,
+categories, tags, images, attributes, downloads, linked products, custom fields). wp_woo_save_variation
+adds and edits variations of a variable product, and wp_woo_bulk_update changes prices and stock for
+up to 100 products or variations at once. wp_woo_save_category, wp_woo_save_coupon and
+wp_woo_save_attribute manage categories, coupons and global attributes.
+
+Orders: wp_woo_create_order, wp_woo_update_order (status, addresses, notes), wp_woo_refund_order,
+wp_woo_list_orders, wp_woo_get_order, wp_woo_list_customers and wp_woo_sales_summary. Changing an order
+status can make WooCommerce email the customer, exactly as it does for a store manager; a refund only
+records the refund unless refund_payment is true, in which case the payment gateway returns the money.
+
+Reading the store: wp_woo_overview (version, currency, counts, settings) and wp_woo_list_config
+(attributes, categories, shipping zones and classes, payment gateways without keys, tax rates, order
+statuses, coupons). Shipping zones, payment gateways and tax rates are read-only here on purpose.
+wp_woo_update_settings changes a short allowlist of store settings (address, currency and price format,
+taxes, coupons, stock thresholds, guest checkout, reviews, units). Gateway keys, emails and URLs cannot
+be changed.
+
+Everything is checked before anything is saved. Changes are in the history and can be rolled back,
+except refunds, permanent deletes and deleting an attribute. wp_create_content, wp_update_content and
+wp_delete_content refuse products, orders and coupons while WooCommerce is active, so they cannot skip
+WooCommerce's rules. Orders and customers hold personal details, so reading them needs Read and edit.
+Refunds, deletes, store settings and global attributes need Full access.
 
 == Advanced Custom Fields ==
 
@@ -76,8 +115,8 @@ needs Full access; setting values needs Read and edit; reading needs Read only.
 Each connected app has an access level, chosen when you approve it and changeable later in
 Connected apps:
 
-    Read only      look at content, layouts, settings and history; change nothing (12 tools)
-    Read and edit  also create and edit content, layouts and media, clear caches and undo (21 tools)
+    Read only      look at content, layouts, settings and history; change nothing (14 tools, 19 with WooCommerce)
+    Read and edit  also create and edit content, layouts and media, clear caches and undo (24 tools, 39 with WooCommerce)
     Full access    everything that is switched on, including delete, settings and plugin tools (all)
 
 Approval defaults to Read and edit. An app is only offered the tools its level allows, and a
@@ -212,6 +251,12 @@ The admin screen bundles the Inter typeface (SIL Open Font License 1.1, see
 assets/fonts/Inter-LICENSE.txt). Nothing is loaded from external servers.
 
 == Changelog ==
+
+= 2.13.0 =
+* WooCommerce support: manage products (simple, variable, grouped and external), variations, categories, coupons and global attributes, update prices and stock in bulk, create and update orders, refund, and read sales, customers and store setup. 19 new tools, offered only while WooCommerce is active.
+* Everything goes through WooCommerce's own functions, is checked before it is saved, and is recorded so it can be rolled back (refunds, permanent deletes and deleting an attribute cannot be undone).
+* Orders and customers need Read and edit access; refunds, deletes, store settings and attributes need Full access. Declared compatible with High-Performance Order Storage.
+* The generic page and post tools now refuse products, orders and coupons while WooCommerce is active.
 
 = 2.12.2 =
 * The approve screen for connecting an AI app now matches the rest of WP MCP: brand header, a clear card, access levels as selectable cards, and the same buttons. Other plugins' notices no longer appear on it.

@@ -123,6 +123,18 @@ class WPMCP_Core {
 		return $result;
 	}
 
+	/** WooCommerce owns products, orders and coupons: changing them as plain posts would skip its stock, price and order rules. */
+	private static function owned_error( $type ) {
+		if ( ! WPMCP_Woo::owns_type( $type ) ) { return null; }
+		return new WP_Error( 'wpmcp_use_woo', sprintf( '"%s" is managed by WooCommerce. Use the wp_woo_* tools (wp_woo_save_product, wp_woo_save_coupon, wp_woo_update_order, wp_woo_delete) so stock, prices and order rules stay correct.', $type ), array( 'status' => 400 ) );
+	}
+
+	private static function validate_write_type( $type ) {
+		$valid = self::validate_type( $type );
+		$owned = self::owned_error( $type );
+		return is_wp_error( $valid ) ? $valid : ( $owned ? $owned : true );
+	}
+
 	private static function validate_type( $type ) {
 		if ( ! post_type_exists( $type ) ) {
 			return new WP_Error(
@@ -158,6 +170,7 @@ class WPMCP_Core {
 			'editors'            => WPMCP_Builders::environment(),
 			'cache_plugins'      => WPMCP_Site::detected_caches(),
 			'acf'                => WPMCP_ACF::status(),
+			'woocommerce'        => WPMCP_Woo::status(),
 			'max_result_chars'   => (int) apply_filters( 'wpmcp_max_result_chars', WPMCP_MAX_RESULT_CHARS ),
 			'post_types'         => $types,
 		);
@@ -227,7 +240,7 @@ class WPMCP_Core {
 	}
 
 	public static function create_content( $type, $body ) {
-		$valid = self::validate_type( $type );
+		$valid = self::validate_write_type( $type );
 		if ( is_wp_error( $valid ) ) {
 			return $valid;
 		}
@@ -264,6 +277,8 @@ class WPMCP_Core {
 	}
 
 	public static function update_content( $type, $id, $body ) {
+		$owned = self::owned_error( $type );
+		if ( $owned ) { return $owned; }
 		$post = get_post( (int) $id );
 		if ( ! $post || $post->post_type !== $type ) {
 			return new WP_Error( 'wpmcp_not_found', 'Item not found for that type/id.', array( 'status' => 404 ) );
@@ -309,6 +324,8 @@ class WPMCP_Core {
 	}
 
 	public static function delete_content( $type, $id, $force = false ) {
+		$owned = self::owned_error( $type );
+		if ( $owned ) { return $owned; }
 		$post = get_post( (int) $id );
 		if ( ! $post || $post->post_type !== $type ) {
 			return new WP_Error( 'wpmcp_not_found', 'Item not found for that type/id.', array( 'status' => 404 ) );

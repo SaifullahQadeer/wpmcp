@@ -311,6 +311,28 @@ class WPMCP_History {
 			$result = WPMCP_ACF::restore( $data['kind'], $data['data'] );
 		} elseif ( 'acf_values' === $op ) {
 			$result = WPMCP_ACF::restore_values( $data, $row['after_hash'], $force );
+		} elseif ( 'woo_props' === $op ) {
+			$result = WPMCP_Woo::restore_props( $data['id'], $data['state'], $row['after_hash'], $force, isset( $data['keys'] ) ? $data['keys'] : null );
+		} elseif ( 'woo_bulk' === $op ) {
+			$result = WPMCP_Woo::restore_bulk( $data['items'], $row['after_hash'], $force );
+		} elseif ( 'woo_coupon' === $op ) {
+			$result = WPMCP_Woo::restore_coupon( $data['id'], $data['state'], $row['after_hash'], $force );
+		} elseif ( 'woo_order' === $op ) {
+			$result = WPMCP_Woo::restore_order( $data['id'], $data['state'], $data['keys'], $data['notes'], $row['after_hash'], $force );
+		} elseif ( 'woo_trash_created' === $op ) {
+			$result = WPMCP_Woo::undo_create( $post_id );
+		} elseif ( 'woo_untrash' === $op ) {
+			$result = WPMCP_Woo::untrash( $data['id'], isset( $data['children'] ) ? $data['children'] : array() );
+		} elseif ( 'woo_term' === $op ) {
+			$result = WPMCP_Woo::restore_term( $data['id'], $data['before'] );
+		} elseif ( 'woo_term_recreate' === $op ) {
+			$result = WPMCP_Woo::recreate_term( $data['before'] );
+		} elseif ( 'woo_attribute' === $op ) {
+			$result = WPMCP_Woo::restore_attribute( $data['id'], $data['before'] );
+		} elseif ( 'woo_attribute_delete' === $op ) {
+			$result = WPMCP_Woo::undo_attribute_create( $data['id'] );
+		} elseif ( 'woo_options' === $op ) {
+			$result = WPMCP_Woo::restore_options( $data['values'] );
 		} elseif ( 'restore_options' === $op ) {
 			$result = WPMCP_Site::restore_options( $data['values'] );
 		} elseif ( 'set_active' === $op ) {

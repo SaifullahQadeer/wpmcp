@@ -177,7 +177,7 @@ class WPMCP_Admin {
 		$grants  = WPMCP_OAuth::list_grants();
 		$last    = $grants ? max( array_map( 'intval', array_column( $grants, 'last_used' ) ) ) : 0;
 		$active  = 0;
-		$tools   = WPMCP_MCP::tools_spec();
+		$tools   = WPMCP_Woo_Tools::visible( WPMCP_MCP::tools_spec() );
 		foreach ( $tools as $tool ) { list( $on ) = $this->tool_status( $tool['name'] ); if ( $on ) { $active++; } }
 		$tiles = array(
 			array( 'system', 'Server', $enabled ? 'Running' : 'Paused', $enabled ? 'ok' : 'warn' ),
@@ -274,6 +274,7 @@ class WPMCP_Admin {
 	/** @return array{0:bool,1:string} whether the tool can run now, and what to turn on if not. */
 	private function tool_status( $name ) {
 		if ( 0 === strpos( $name, 'wp_acf_' ) ) { return WPMCP_ACF::available() ? array( true, '' ) : array( false, 'Needs ACF' ); }
+		if ( in_array( $name, WPMCP_Woo_Tools::names(), true ) ) { return WPMCP_Woo::available() ? array( true, '' ) : array( false, 'Needs WooCommerce' ); }
 		if ( ! in_array( $name, WPMCP_Extensions::tool_names(), true ) ) { return array( true, '' ); }
 		if ( is_multisite() ) { return array( false, 'Not supported on multisite' ); }
 		if ( '1' !== (string) get_option( 'wpmcp_extensions_enabled', '0' ) ) { return array( false, 'Turn on extension access' ); }
@@ -291,20 +292,23 @@ class WPMCP_Admin {
 			'Divi'                     => array( 'wp_get_divi', 'wp_set_divi' ),
 			'Media & taxonomy'         => array( 'wp_upload_media', 'wp_list_media', 'wp_list_terms', 'wp_create_term' ),
 			'Advanced Custom Fields'   => array( 'wp_acf_list', 'wp_acf_save_post_type', 'wp_acf_save_taxonomy', 'wp_acf_save_field_group', 'wp_acf_delete', 'wp_acf_get_values', 'wp_acf_set_values' ),
+			'WooCommerce'              => WPMCP_Woo_Tools::names(),
 			'Settings & cache'         => array( 'wp_get_settings', 'wp_update_settings', 'wp_clear_cache' ),
 			'History'                  => array( 'wp_list_history', 'wp_rollback' ),
 			'Plugins & themes'         => WPMCP_Extensions::tool_names(),
 		);
 		$specs = array();
 		$on    = 0;
-		foreach ( WPMCP_MCP::tools_spec() as $spec ) {
+		foreach ( WPMCP_Woo_Tools::visible( WPMCP_MCP::tools_spec() ) as $spec ) {
 			$specs[ $spec['name'] ] = $spec;
 			list( $enabled ) = $this->tool_status( $spec['name'] );
 			if ( $enabled ) { $on++; }
 		}
 		?>
 		<section class="wpmcp-panel"><div class="wpmcp-panel-head"><h2><?php echo $this->icon( 'tools' ); // phpcs:ignore WordPress.Security.EscapeOutput ?>Tools</h2><p><?php echo (int) $on; ?> of <?php echo (int) count( $specs ); ?> are on. Hover a tool to see what it does. Each app’s access level (Read only, Read and edit, Full access) decides which of these it can use. Plugin and theme tools stay off until you turn them on in Security.</p></div>
-		<?php foreach ( $groups as $group => $names ) : ?>
+		<?php foreach ( $groups as $group => $names ) :
+			if ( ! array_intersect( $names, array_keys( $specs ) ) ) { continue; } // A group whose tools are not offered (WooCommerce while it is off) is not shown.
+			?>
 			<h3 class="wpmcp-group"><?php echo esc_html( $group ); ?></h3>
 			<ul class="wpmcp-toollist">
 			<?php foreach ( $names as $name ) :
@@ -465,6 +469,7 @@ class WPMCP_Admin {
 		$divi    = WPMCP_Builders::divi_info();
 		$caches  = WPMCP_Site::detected_caches();
 		$acf     = WPMCP_ACF::status();
+		$woo     = WPMCP_Woo::status();
 		return array(
 			array( $enabled ? 'ok' : 'warn', 'MCP server', $enabled ? 'Running' : 'Paused. Turn it on in Security.' ),
 			array( $https ? 'ok' : 'warn', 'HTTPS', $https ? 'On' : 'Off. Sign-in and extension tools need it.' ),
@@ -475,6 +480,7 @@ class WPMCP_Admin {
 			array( ! empty( $el['active'] ) ? 'ok' : 'info', 'Elementor', ! empty( $el['active'] ) ? $el['version'] . ' · ' . $el['generation'] : 'Not installed' ),
 			array( ! empty( $divi['active'] ) ? 'ok' : 'info', 'Divi', ! empty( $divi['active'] ) ? $divi['version'] . ' · ' . $divi['generation'] : 'Not installed' ),
 			array( ! empty( $acf['active'] ) ? 'ok' : 'info', 'Advanced Custom Fields', ! empty( $acf['active'] ) ? 'ACF ' . $acf['version'] . ' · ' . ( 'pro' === $acf['edition'] ? 'Pro' : 'free' ) : 'Not installed' ),
+			array( ! empty( $woo['active'] ) ? 'ok' : 'info', 'WooCommerce', ! empty( $woo['active'] ) ? $woo['version'] . ' · orders in ' . $woo['orders_storage'] : 'Not installed' ),
 			array( $caches ? 'ok' : 'info', 'Page cache', $caches ? implode( ', ', $caches ) : 'None detected' ),
 		);
 	}
@@ -501,6 +507,7 @@ class WPMCP_Admin {
 		$el_v4   = $el_on && 'v4-atomic' === $el['generation'];
 		$divi_on = ! empty( $divi['active'] );
 		$acf     = WPMCP_ACF::status();
+		$woo     = WPMCP_Woo::status();
 		$tiles   = array(
 			array( 'layers', 'Block editor (Gutenberg)', 'Block pages, patterns and templates, with markup checked before it is saved.', true, ! empty( $ed['gutenberg']['block_theme'] ) ? 'Block theme' : 'Active' ),
 			array( 'tools', 'Elementor 3 (classic)', 'Containers, sections and widgets, plus page settings.', $el_on && ! $el_v4, $el_on && ! $el_v4 ? $el['version'] : '' ),
@@ -508,6 +515,7 @@ class WPMCP_Admin {
 			array( 'code', 'Divi 4 (shortcodes)', 'Sections, rows and modules, read and written section by section.', $divi_on && 'v4-shortcodes' === $divi['generation'], $divi_on && 'v4-shortcodes' === $divi['generation'] ? $divi['version'] : '' ),
 			array( 'code', 'Divi 5 (blocks)', 'Block-based layouts through the block editor tools.', $divi_on && 'v5-blocks' === $divi['generation'], $divi_on && 'v5-blocks' === $divi['generation'] ? $divi['version'] : '' ),
 			array( 'key', 'Advanced Custom Fields', 'Free and Pro: create post types, taxonomies and field groups, and read and write field values.', ! empty( $acf['active'] ), ! empty( $acf['active'] ) ? $acf['version'] . ( 'pro' === $acf['edition'] ? ' Pro' : ' free' ) : '' ),
+			array( 'cart', 'WooCommerce', 'Products, variations, orders, coupons, stock and store settings, through WooCommerce itself.', ! empty( $woo['active'] ), ! empty( $woo['active'] ) ? $woo['version'] : '' ),
 			array( 'book', 'Posts, pages and custom types', 'Content, media, terms and custom fields, with history and rollback.', true, 'Active' ),
 			array( 'system', 'Caches', 'Object cache, Elementor and Divi CSS, and page cache plugins such as LiteSpeed, WP Rocket and W3 Total Cache.', (bool) $caches, $caches ? implode( ', ', $caches ) : '' ),
 			array( 'key', 'Site settings and plugins', 'Title, permalinks, homepage, and plugin and theme activation (opt-in).', true, 'Active' ),
@@ -531,6 +539,7 @@ class WPMCP_Admin {
 		if ( null === $paths ) {
 			$paths = array(
 				'bolt'     => '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',
+				'cart'     => '<circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l2.7 12.4a1 1 0 0 0 1 .8h8.9a1 1 0 0 0 1-.8L20 7H6"/>',
 				'connect'  => '<path d="M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0z"/><path d="M12 18v4"/>',
 				'tools'    => '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/>',
 				'history'  => '<path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 7v5l3 2"/>',

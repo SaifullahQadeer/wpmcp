@@ -292,7 +292,7 @@ class WPMCP_MCP {
 				) );
 
 			case 'tools/list':
-				$result = array( 'tools' => WPMCP_Permissions::filter( self::tools_spec(), WPMCP_Auth::$level ) );
+				$result = array( 'tools' => WPMCP_Permissions::filter( WPMCP_Woo_Tools::visible( self::tools_spec() ), WPMCP_Auth::$level ) );
 				if ( $this->is_stateless_rev() ) {
 					$result['ttlMs']      = 300000;
 					$result['cacheScope'] = 'private';
@@ -337,7 +337,7 @@ class WPMCP_MCP {
 			. "Before editing code: read the existing file, preserve literal PHP tags (never HTML-encode source), run wp_edit_extension_file with dry_run=true, then apply one change at a time using the current hash. Save the returned backup_id, run wp_ping, and check the affected page. Backups can be listed and restored while WordPress still works. Stop issuing edits if responses become malformed; bootstrap failures require hosting backup, SFTP, or file-manager recovery. Never claim this connector can repair every outage.\n"
 			. "Call wp_ping first: it reports the Elementor version and editor generation (v3 classic vs v4 atomic), which decides the JSON shape wp_set_elementor expects.\n"
 			. "Every change you make is recorded. If the user asks to undo something, call wp_list_history to find it and wp_rollback to reverse it; if wp_rollback reports the item was edited since, tell the user before using force.\n"
-			. "Check a page's \"builder\" (from wp_get_content or wp_ping) before editing its layout: gutenberg pages use wp_get_blocks and wp_set_blocks (block markup, checked before saving), elementor pages use wp_get_elementor and wp_set_elementor, divi pages use wp_get_divi and wp_set_divi, and classic pages use wp_update_content. Do not mix editors on one page. For Advanced Custom Fields call wp_acf_list first: create post types and taxonomies with wp_acf_save_post_type and wp_acf_save_taxonomy, fields with wp_acf_save_field_group, and set values with wp_acf_set_values or the \"acf\" argument of wp_create_content (never write ACF values as plain meta). After changing layouts, settings or plugins, call wp_clear_cache if the front end does not show the change.\n"
+			. "Check a page's \"builder\" (from wp_get_content or wp_ping) before editing its layout: gutenberg pages use wp_get_blocks and wp_set_blocks (block markup, checked before saving), elementor pages use wp_get_elementor and wp_set_elementor, divi pages use wp_get_divi and wp_set_divi, and classic pages use wp_update_content. Do not mix editors on one page. For Advanced Custom Fields call wp_acf_list first: create post types and taxonomies with wp_acf_save_post_type and wp_acf_save_taxonomy, fields with wp_acf_save_field_group, and set values with wp_acf_set_values or the \"acf\" argument of wp_create_content (never write ACF values as plain meta). For a WooCommerce store call wp_woo_overview first and use the wp_woo_* tools for products, variations, orders, coupons and stock (never wp_create_content or wp_update_content on products or orders). Variable products: save the product with attributes marked variation:true, then add each variation with wp_woo_save_variation. Changing an order status can email the customer, and a refund with refund_payment true returns real money: confirm both with the user first. After changing layouts, settings or plugins, call wp_clear_cache if the front end does not show the change.\n"
 			. "Elementor layouts can be very large. Read them with wp_get_elementor using summary=true first, then fetch one section at a time with index=N. Write them back section by section using the __append__ or __replace__ markers rather than resending the whole tree.";
 	}
 
@@ -415,7 +415,12 @@ class WPMCP_MCP {
 				return 'call wp_get_divi with summary=true for the outline, then index=N for one section.';
 			case 'wp_list_content':
 			case 'wp_list_media':
+			case 'wp_woo_list_products':
+			case 'wp_woo_list_orders':
+			case 'wp_woo_list_customers':
 				return 'lower per_page and page through the results.';
+			case 'wp_woo_get_product':
+				return 'read a smaller product, or list products with wp_woo_list_products first.';
 			default:
 				return 'request fewer or smaller items.';
 		}
@@ -440,6 +445,9 @@ class WPMCP_MCP {
 	private function run_tool( $name, $args ) {
 		if ( in_array( $name, WPMCP_Extensions::tool_names(), true ) ) {
 			return WPMCP_Extensions::run( $name, $args );
+		}
+		if ( in_array( $name, WPMCP_Woo_Tools::names(), true ) ) {
+			return WPMCP_Woo_Tools::run( $name, $args );
 		}
 		switch ( $name ) {
 			case 'wp_ping':
@@ -657,7 +665,7 @@ class WPMCP_MCP {
 	}
 
 	public static function tools_spec() {
-		return array_merge( self::content_tools_spec(), WPMCP_Extensions::tools_spec() );
+		return array_merge( self::content_tools_spec(), WPMCP_Extensions::tools_spec(), WPMCP_Woo_Tools::tools_spec() );
 	}
 
 	private static function content_tools_spec() {

@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name:       WP MCP
- * Description:       Turns this WordPress site into its own remote MCP server so Claude, Gemini or any MCP client can manage pages, posts, custom post types, media, taxonomies, ACF fields, and Gutenberg, Divi and Elementor layouts.
- * Version:           2.12.2
+ * Description:       Turns this WordPress site into its own remote MCP server so Claude, Gemini or any MCP client can manage pages, posts, custom post types, media, taxonomies, ACF fields, WooCommerce stores, and Gutenberg, Divi and Elementor layouts.
+ * Version:           2.13.0
  * Author:            Saifullah Qadeer
  * License:           GPL-2.0-or-later
  * Text Domain:       wp-mcp
@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // No direct access.
 }
 
-define( 'WPMCP_VERSION', '2.12.2' );
+define( 'WPMCP_VERSION', '2.13.0' );
 define( 'WPMCP_NAMESPACE', 'wpmcp/v1' );
 define( 'WPMCP_PLUGIN_FILE', __FILE__ );
 define( 'WPMCP_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
@@ -36,6 +36,8 @@ require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-history.php';
 require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-builders.php';
 require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-site.php';
 require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-acf.php';
+require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-woo.php';
+require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-woo-tools.php';
 require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-file-safety.php';
 require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-extensions.php';
 require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-elementor.php';
@@ -62,6 +64,16 @@ function wpmcp_activate() {
 	}
 }
 register_activation_hook( __FILE__, 'wpmcp_activate' );
+
+/**
+ * WooCommerce checks plugins for High-Performance Order Storage compatibility. WP MCP only reaches
+ * orders through WooCommerce's own order functions, never the order tables, so it is compatible.
+ */
+add_action( 'before_woocommerce_init', function () {
+	if ( class_exists( '\Automattic\WooCommerce\Utilities\FeaturesUtil' ) ) {
+		\Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility( 'custom_order_tables', WPMCP_PLUGIN_FILE, true );
+	}
+} );
 
 /**
  * Bootstrap the plugin.
