@@ -3,7 +3,7 @@ Author: Saifullah Qadeer
 Requires at least: 5.6
 Requires PHP: 7.4
 Tested with Elementor: 4.x
-Stable tag: 1.0.0
+Stable tag: 1.0.1
 License: GPL-2.0-or-later
 
 Turns a WordPress site into its own remote MCP server, so Claude (web, Desktop,
@@ -106,6 +106,9 @@ The admin screen bundles the Inter typeface (SIL Open Font License 1.1, see
 assets/fonts/Inter-LICENSE.txt). Nothing is loaded from external servers.
 
 == Changelog ==
+
+= 1.0.1 =
+* Maintenance update to check that updates reach your site. No changes to features.
 
 = 1.0.0 =
 * First public release. WP MCP turns your site into its own MCP server: connect Claude, ChatGPT, Claude Code, Cursor, VS Code or any MCP client over HTTPS, with sign-in through OAuth or an API key.
