@@ -19,6 +19,7 @@ class WPMCP_OAuth {
 	const MAX_CLIENTS   = 100;
 	const MAX_FAILURES  = 30;
 	const PAGE          = 'wpmcp-authorize';
+	const WK_CACHE      = 'wpmcp_wellknown'; // ok, blocked, unknown or probing: can the root /.well-known/ pages reach WordPress?
 
 	/* ----------------------------------------------------------------- */
 	/* Wiring                                                            */
@@ -38,7 +39,37 @@ class WPMCP_OAuth {
 		return '1' === (string) get_option( 'wpmcp_oauth_enabled', '1' ) && 'https' === wp_parse_url( home_url(), PHP_URL_SCHEME );
 	}
 
-	public static function issuer() { return untrailingslashit( home_url() ); }
+	/**
+	 * The authorization server's address. Normally the site address. Some hosts answer every /.well-known/ request
+	 * themselves (a 404 or 403 that never reaches WordPress), so clients cannot find the sign-in service and report
+	 * "couldn't register". On such a host the issuer moves under the REST address, which clients find without
+	 * /.well-known/: path appending (OpenID Connect discovery) and path insertion (RFC 8414) both work for it.
+	 */
+	public static function issuer() {
+		$mode = apply_filters( 'wpmcp_oauth_issuer_mode', self::wellknown_blocked() ? 'path' : 'root' );
+		return 'path' === $mode ? self::path_issuer() : self::root_issuer();
+	}
+	public static function root_issuer() { return untrailingslashit( home_url() ); }
+	public static function path_issuer() { return untrailingslashit( home_url( '/' . rest_get_url_prefix() . '/' . WPMCP_NAMESPACE . '/oauth' ) ); }
+
+	/** True when the host swallows /.well-known/. Found by asking the site's own address once and remembering the answer. */
+	public static function wellknown_blocked() {
+		$state = get_transient( self::WK_CACHE );
+		if ( false === $state ) {
+			set_transient( self::WK_CACHE, 'probing', 30 ); // The request below reaches this code too: it must not start another probe.
+			$state = self::probe_wellknown();
+			set_transient( self::WK_CACHE, $state, 'ok' === $state ? 12 * HOUR_IN_SECONDS : ( 'blocked' === $state ? HOUR_IN_SECONDS : 600 ) );
+		}
+		return 'blocked' === $state;
+	}
+
+	private static function probe_wellknown() {
+		$reply = wp_remote_get( home_url( '/.well-known/oauth-authorization-server' ), array( 'timeout' => 5, 'redirection' => 0, 'headers' => array( 'Accept' => 'application/json' ), 'user-agent' => 'WP-MCP-Selfcheck' ) );
+		if ( is_wp_error( $reply ) ) { return 'unknown'; } // No answer at all (loopback blocked): keep the normal address.
+		$doc = json_decode( (string) wp_remote_retrieve_body( $reply ), true );
+		return 200 === (int) wp_remote_retrieve_response_code( $reply ) && is_array( $doc ) && isset( $doc['authorization_endpoint'] ) ? 'ok' : 'blocked';
+	}
+
 	public static function resource_url() { return rest_url( WPMCP_NAMESPACE . '/mcp' ); }
 	public static function authorize_url() { return admin_url( 'admin.php?page=' . self::PAGE ); }
 
@@ -58,6 +89,15 @@ class WPMCP_OAuth {
 		);
 	}
 
+	/** The same document in the shape OpenID Connect discovery expects; clients that look there need the extra fields. No ID tokens are issued. */
+	public static function openid_metadata() {
+		return self::server_metadata() + array(
+			'jwks_uri'                              => rest_url( WPMCP_NAMESPACE . '/oauth/jwks' ),
+			'subject_types_supported'               => array( 'public' ),
+			'id_token_signing_alg_values_supported' => array( 'RS256' ),
+		);
+	}
+
 	public static function resource_metadata() {
 		return array(
 			'resource'                 => self::resource_url(),
@@ -72,8 +112,9 @@ class WPMCP_OAuth {
 	public static function serve_well_known() {
 		if ( ! self::enabled() || ! isset( $_SERVER['REQUEST_URI'], $_SERVER['REQUEST_METHOD'] ) || ! in_array( $_SERVER['REQUEST_METHOD'], array( 'GET', 'HEAD' ), true ) ) { return; }
 		$path = wp_parse_url( wp_unslash( $_SERVER['REQUEST_URI'] ), PHP_URL_PATH );
-		if ( ! is_string( $path ) || false === strpos( $path, '/.well-known/oauth-' ) ) { return; }
+		if ( ! is_string( $path ) || false === strpos( $path, '/.well-known/' ) ) { return; }
 		if ( preg_match( '#/\.well-known/oauth-authorization-server(?:/|$)#', $path ) ) { $doc = self::server_metadata(); }
+		elseif ( preg_match( '#/\.well-known/openid-configuration(?:/|$)#', $path ) ) { $doc = self::openid_metadata(); }
 		elseif ( preg_match( '#/\.well-known/oauth-protected-resource(?:/|$)#', $path ) ) { $doc = self::resource_metadata(); }
 		else { return; }
 		self::no_cache();
@@ -117,6 +158,10 @@ class WPMCP_OAuth {
 		register_rest_route( $ns, '/revoke', array( 'methods' => 'POST', 'callback' => array( __CLASS__, 'rest_revoke' ), 'permission_callback' => $any ) );
 		register_rest_route( $ns, '/resource', array( 'methods' => 'GET', 'callback' => array( __CLASS__, 'rest_resource' ), 'permission_callback' => $any ) );
 		register_rest_route( $ns, '/server', array( 'methods' => 'GET', 'callback' => array( __CLASS__, 'rest_server' ), 'permission_callback' => $any ) );
+		// Where clients look when the host hides /.well-known/: the issuer plus /.well-known/..., under the REST address.
+		register_rest_route( $ns, '/\.well-known/oauth-authorization-server', array( 'methods' => 'GET', 'callback' => array( __CLASS__, 'rest_server' ), 'permission_callback' => $any ) );
+		register_rest_route( $ns, '/\.well-known/openid-configuration', array( 'methods' => 'GET', 'callback' => array( __CLASS__, 'rest_openid' ), 'permission_callback' => $any ) );
+		register_rest_route( $ns, '/jwks', array( 'methods' => 'GET', 'callback' => array( __CLASS__, 'rest_jwks' ), 'permission_callback' => $any ) );
 	}
 
 	private static function json( $status, $data ) {
@@ -141,6 +186,8 @@ class WPMCP_OAuth {
 	}
 
 	public static function rest_resource() { return self::enabled() ? self::json( 200, self::resource_metadata() ) : self::json( 404, array( 'error' => 'not_found' ) ); }
+	public static function rest_openid() { return self::enabled() ? self::json( 200, self::openid_metadata() ) : self::json( 404, array( 'error' => 'not_found' ) ); }
+	public static function rest_jwks() { return self::json( 200, array( 'keys' => array() ) ); } // No ID tokens are signed, so there are no keys.
 	public static function rest_server() { return self::enabled() ? self::json( 200, self::server_metadata() ) : self::json( 404, array( 'error' => 'not_found' ) ); }
 
 	public static function rest_register( $request ) {
