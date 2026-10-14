@@ -394,8 +394,9 @@ class WPMCP_MCP {
 		);
 
 		// Structured output (2025-06-18+). Only when small, so the two copies
-		// together stay inside the host's cap.
-		if ( strlen( $text ) < 40000 && is_array( $result ) ) {
+		// together stay inside the host's cap. It must be a JSON object: a list (or an empty array) there makes
+		// strict clients reject the whole answer, so lists go as text only.
+		if ( strlen( $text ) < 40000 && is_array( $result ) && ! empty( $result ) && array_keys( $result ) !== range( 0, count( $result ) - 1 ) ) {
 			$payload['structuredContent'] = $result;
 		}
 
