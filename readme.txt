@@ -3,7 +3,7 @@ Author: Saifullah Qadeer
 Requires at least: 5.6
 Requires PHP: 7.4
 Tested with Elementor: 4.x
-Stable tag: 1.0.5
+Stable tag: 1.0.6
 License: GPL-2.0-or-later
 
 Turns a WordPress site into its own remote MCP server, so Claude (web, Desktop,
@@ -106,6 +106,10 @@ The admin screen bundles the Inter typeface (SIL Open Font License 1.1, see
 assets/fonts/Inter-LICENSE.txt). Nothing is loaded from external servers.
 
 == Changelog ==
+
+= 1.0.6 =
+* Fixed: apps still could not connect on hosts that hide /.well-known/ addresses. WP MCP now always publishes its sign-in details under its own address, and the default sign-in addresses an app tries when it finds nothing (/register, /token and /authorize) answer too. Pages with those names on your site are not touched.
+* After updating, remove the app under Connected apps and connect it once more.
 
 = 1.0.5 =
 * Fixed: some hosts answer every /.well-known/ address themselves, so Claude could not find the sign-in service and said it could not register. WP MCP now notices this and publishes its sign-in details under its own address instead. The System tab shows when that happens.

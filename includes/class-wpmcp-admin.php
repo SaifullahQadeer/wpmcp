@@ -463,13 +463,11 @@ class WPMCP_Admin {
 		$https   = 'https' === wp_parse_url( home_url(), PHP_URL_SCHEME );
 		$pretty  = (bool) get_option( 'permalink_structure' );
 		$el      = WPMCP_Elementor::environment();
-		$hidden  = WPMCP_OAuth::enabled() && WPMCP_OAuth::wellknown_blocked();
 		$checks  = array(
 			array( $enabled ? 'ok' : 'warn', 'MCP server', $enabled ? 'Running' : 'Paused. Turn it on in Security.' ),
 			array( $https ? 'ok' : 'warn', 'HTTPS', $https ? 'On' : 'Off. Sign-in needs it.' ),
 			array( $pretty ? 'ok' : 'warn', 'Pretty permalinks', $pretty ? 'On' : 'Off. The REST API address needs them.' ),
 			array( WPMCP_OAuth::enabled() ? 'ok' : 'warn', 'OAuth sign-in', WPMCP_OAuth::enabled() ? 'On' : 'Off. Apps need an API key instead.' ),
-			array( $hidden ? 'info' : 'ok', 'Sign-in discovery', $hidden ? 'Your host hides /.well-known/, so a fallback address is used. If an app still cannot connect, ask your host to let /.well-known/ reach WordPress.' : 'Reachable' ),
 			array( version_compare( PHP_VERSION, '7.4', '>=' ) ? 'ok' : 'warn', 'PHP', PHP_VERSION ),
 			array( ! empty( $el['active'] ) ? 'ok' : 'info', 'Elementor', ! empty( $el['active'] ) ? $el['version'] . ' · ' . $el['generation'] : 'Not installed' ),
 			array( WPMCP_Plans::pro_installed() ? 'ok' : 'info', 'WP MCP Pro add-on', WPMCP_Plans::pro_installed() ? WPMCP_Plans::label( WPMCP_Plans::current() ) . ' plan' : 'Not installed. Free plan.' ),

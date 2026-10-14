@@ -19,7 +19,6 @@ class WPMCP_OAuth {
 	const MAX_CLIENTS   = 100;
 	const MAX_FAILURES  = 30;
 	const PAGE          = 'wpmcp-authorize';
-	const WK_CACHE      = 'wpmcp_wellknown'; // ok, blocked, unknown or probing: can the root /.well-known/ pages reach WordPress?
 
 	/* ----------------------------------------------------------------- */
 	/* Wiring                                                            */
@@ -28,6 +27,7 @@ class WPMCP_OAuth {
 	public static function register_hooks() {
 		add_action( 'rest_api_init', array( __CLASS__, 'register_routes' ) );
 		add_action( 'init', array( __CLASS__, 'serve_well_known' ), 0 );
+		add_action( 'init', array( __CLASS__, 'serve_legacy_endpoints' ), 0 );
 		add_action( 'admin_menu', array( __CLASS__, 'add_authorize_page' ) );
 		add_action( 'admin_init', array( __CLASS__, 'handle_decision' ) );
 		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'authorize_assets' ) );
@@ -40,42 +40,24 @@ class WPMCP_OAuth {
 	}
 
 	/**
-	 * The authorization server's address. Normally the site address. Some hosts answer every /.well-known/ request
-	 * themselves (a 404 or 403 that never reaches WordPress), so clients cannot find the sign-in service and report
-	 * "couldn't register". On such a host the issuer moves under the REST address, which clients find without
-	 * /.well-known/: path appending (OpenID Connect discovery) and path insertion (RFC 8414) both work for it.
+	 * The authorization server's address. It lives under the REST address, not at the site root: a host can answer every
+	 * /.well-known/ request itself (a 404 that never reaches WordPress), and clients then cannot find a root issuer's
+	 * documents and report "couldn't register". A path issuer is found without it: RFC 8414 path insertion where
+	 * /.well-known/ works, OpenID Connect path appending (a REST route) where it does not. A site can return 'root' from
+	 * the wpmcp_oauth_issuer_mode filter to keep the site address.
 	 */
 	public static function issuer() {
-		$mode = apply_filters( 'wpmcp_oauth_issuer_mode', self::wellknown_blocked() ? 'path' : 'root' );
-		return 'path' === $mode ? self::path_issuer() : self::root_issuer();
+		return 'root' === apply_filters( 'wpmcp_oauth_issuer_mode', 'path' ) ? self::root_issuer() : self::path_issuer();
 	}
 	public static function root_issuer() { return untrailingslashit( home_url() ); }
 	public static function path_issuer() { return untrailingslashit( home_url( '/' . rest_get_url_prefix() . '/' . WPMCP_NAMESPACE . '/oauth' ) ); }
 
-	/** True when the host swallows /.well-known/. Found by asking the site's own address once and remembering the answer. */
-	public static function wellknown_blocked() {
-		$state = get_transient( self::WK_CACHE );
-		if ( false === $state ) {
-			set_transient( self::WK_CACHE, 'probing', 30 ); // The request below reaches this code too: it must not start another probe.
-			$state = self::probe_wellknown();
-			set_transient( self::WK_CACHE, $state, 'ok' === $state ? 12 * HOUR_IN_SECONDS : ( 'blocked' === $state ? HOUR_IN_SECONDS : 600 ) );
-		}
-		return 'blocked' === $state;
-	}
-
-	private static function probe_wellknown() {
-		$reply = wp_remote_get( home_url( '/.well-known/oauth-authorization-server' ), array( 'timeout' => 5, 'redirection' => 0, 'headers' => array( 'Accept' => 'application/json' ), 'user-agent' => 'WP-MCP-Selfcheck' ) );
-		if ( is_wp_error( $reply ) ) { return 'unknown'; } // No answer at all (loopback blocked): keep the normal address.
-		$doc = json_decode( (string) wp_remote_retrieve_body( $reply ), true );
-		return 200 === (int) wp_remote_retrieve_response_code( $reply ) && is_array( $doc ) && isset( $doc['authorization_endpoint'] ) ? 'ok' : 'blocked';
-	}
-
 	public static function resource_url() { return rest_url( WPMCP_NAMESPACE . '/mcp' ); }
 	public static function authorize_url() { return admin_url( 'admin.php?page=' . self::PAGE ); }
 
-	public static function server_metadata() {
+	public static function server_metadata( $issuer = '' ) {
 		return array(
-			'issuer'                                    => self::issuer(),
+			'issuer'                                    => '' === $issuer ? self::issuer() : $issuer,
 			'authorization_endpoint'                    => self::authorize_url(),
 			'token_endpoint'                            => rest_url( WPMCP_NAMESPACE . '/oauth/token' ),
 			'registration_endpoint'                     => rest_url( WPMCP_NAMESPACE . '/oauth/register' ),
@@ -90,8 +72,8 @@ class WPMCP_OAuth {
 	}
 
 	/** The same document in the shape OpenID Connect discovery expects; clients that look there need the extra fields. No ID tokens are issued. */
-	public static function openid_metadata() {
-		return self::server_metadata() + array(
+	public static function openid_metadata( $issuer = '' ) {
+		return self::server_metadata( $issuer ) + array(
 			'jwks_uri'                              => rest_url( WPMCP_NAMESPACE . '/oauth/jwks' ),
 			'subject_types_supported'               => array( 'public' ),
 			'id_token_signing_alg_values_supported' => array( 'RS256' ),
@@ -113,13 +95,66 @@ class WPMCP_OAuth {
 		if ( ! self::enabled() || ! isset( $_SERVER['REQUEST_URI'], $_SERVER['REQUEST_METHOD'] ) || ! in_array( $_SERVER['REQUEST_METHOD'], array( 'GET', 'HEAD' ), true ) ) { return; }
 		$path = wp_parse_url( wp_unslash( $_SERVER['REQUEST_URI'] ), PHP_URL_PATH );
 		if ( ! is_string( $path ) || false === strpos( $path, '/.well-known/' ) ) { return; }
-		if ( preg_match( '#/\.well-known/oauth-authorization-server(?:/|$)#', $path ) ) { $doc = self::server_metadata(); }
-		elseif ( preg_match( '#/\.well-known/openid-configuration(?:/|$)#', $path ) ) { $doc = self::openid_metadata(); }
+		// The bare address at the site root is what older clients ask for: it keeps the site address as issuer. With a path after it, the path issuer.
+		$bare = (bool) preg_match( '#/\.well-known/[a-z-]+/?$#', $path );
+		if ( preg_match( '#/\.well-known/oauth-authorization-server(?:/|$)#', $path ) ) { $doc = self::server_metadata( $bare ? self::root_issuer() : '' ); }
+		elseif ( preg_match( '#/\.well-known/openid-configuration(?:/|$)#', $path ) ) { $doc = self::openid_metadata( $bare ? self::root_issuer() : '' ); }
 		elseif ( preg_match( '#/\.well-known/oauth-protected-resource(?:/|$)#', $path ) ) { $doc = self::resource_metadata(); }
 		else { return; }
 		self::no_cache();
 		header( 'Access-Control-Allow-Origin: *' );
 		wp_send_json( $doc );
+	}
+
+	/**
+	 * A client that cannot read the discovery documents falls back to /authorize, /token and /register at the site
+	 * root. Those addresses answer here, but only for a request that looks like ours, so a real page with one of those
+	 * names (a shop's /register) is left alone.
+	 *
+	 * @return array|null array( 'json', status, data ) or array( 'redirect', url ); null when the request is not ours.
+	 */
+	public static function legacy_route( $method, $route, $query, $post, $body, $content_type, $basic ) {
+		if ( 'POST' === $method && '/register' === $route ) {
+			$data = is_string( $content_type ) && false !== stripos( $content_type, 'json' ) ? json_decode( (string) $body, true ) : null;
+			if ( ! is_array( $data ) || ! isset( $data['redirect_uris'] ) || ! is_array( $data['redirect_uris'] ) ) { return null; }
+			list( $status, $out ) = self::do_register( $data );
+			return array( 'json', $status, $out );
+		}
+		if ( 'POST' === $method && '/token' === $route ) {
+			$params = is_array( $post ) && ! empty( $post ) ? $post : json_decode( (string) $body, true );
+			if ( ! is_array( $params ) ) { return null; }
+			if ( empty( $params['client_id'] ) && is_string( $basic ) && 0 === stripos( $basic, 'Basic ' ) ) {
+				$pair = explode( ':', (string) base64_decode( substr( $basic, 6 ), true ), 2 );
+				if ( ! empty( $pair[0] ) ) { $params['client_id'] = rawurldecode( $pair[0] ); }
+			}
+			if ( empty( $params['client_id'] ) || ! is_string( $params['client_id'] ) || 0 !== strpos( $params['client_id'], 'wpmcp_c_' ) ) { return null; }
+			list( $status, $out ) = self::do_token( $params );
+			return array( 'json', $status, $out );
+		}
+		if ( 'GET' === $method && '/authorize' === $route && isset( $query['client_id'], $query['response_type'] ) && is_string( $query['client_id'] ) && 0 === strpos( $query['client_id'], 'wpmcp_c_' ) ) {
+			$keep = array();
+			foreach ( array( 'response_type', 'client_id', 'redirect_uri', 'state', 'code_challenge', 'code_challenge_method', 'scope', 'resource' ) as $name ) {
+				if ( isset( $query[ $name ] ) && is_string( $query[ $name ] ) ) { $keep[ $name ] = $query[ $name ]; }
+			}
+			return array( 'redirect', self::authorize_url() . '&' . http_build_query( $keep, '', '&', PHP_QUERY_RFC3986 ) );
+		}
+		return null;
+	}
+
+	public static function serve_legacy_endpoints() {
+		if ( ! self::enabled() || empty( $_SERVER['REQUEST_URI'] ) || empty( $_SERVER['REQUEST_METHOD'] ) || ! in_array( $_SERVER['REQUEST_METHOD'], array( 'GET', 'POST' ), true ) ) { return; }
+		$path = wp_parse_url( wp_unslash( $_SERVER['REQUEST_URI'] ), PHP_URL_PATH );
+		if ( ! is_string( $path ) ) { return; }
+		$home = rtrim( (string) wp_parse_url( home_url(), PHP_URL_PATH ), '/' );
+		if ( '' !== $home && 0 === strpos( $path, $home . '/' ) ) { $path = substr( $path, strlen( $home ) ); }
+		$route = '/' . trim( $path, '/' );
+		if ( ! in_array( $route, array( '/register', '/token', '/authorize' ), true ) ) { return; }
+		$body   = 'POST' === $_SERVER['REQUEST_METHOD'] ? (string) file_get_contents( 'php://input', false, null, 0, 65536 ) : '';
+		$result = self::legacy_route( $_SERVER['REQUEST_METHOD'], $route, wp_unslash( $_GET ), wp_unslash( $_POST ), $body, isset( $_SERVER['CONTENT_TYPE'] ) ? (string) $_SERVER['CONTENT_TYPE'] : '', isset( $_SERVER['HTTP_AUTHORIZATION'] ) ? (string) $_SERVER['HTTP_AUTHORIZATION'] : '' );
+		if ( ! $result ) { return; }
+		self::no_cache();
+		if ( 'redirect' === $result[0] ) { wp_safe_redirect( $result[1] ); exit; }
+		wp_send_json( $result[2], $result[1] );
 	}
 
 	/** Header that tells a client without valid credentials where to start OAuth. */
