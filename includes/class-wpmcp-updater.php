@@ -36,14 +36,14 @@ class WPMCP_Updater {
 	 *
 	 * @return array|null
 	 */
-	private function release() {
-		// "Check Again" on Dashboard -> Updates bypasses the cache.
-		if ( is_admin() && isset( $_GET['force-check'] ) && current_user_can( 'update_plugins' ) ) { delete_site_transient( self::CACHE ); }
+	private function release( $fresh = false ) {
+		// "Check Again" on Dashboard -> Updates bypasses the cache, here and at the update server.
+		if ( is_admin() && isset( $_GET['force-check'] ) && current_user_can( 'update_plugins' ) ) { delete_site_transient( self::CACHE ); $fresh = true; }
 		$cached = get_site_transient( self::CACHE );
 		if ( false !== $cached ) { return $cached ? $cached : null; }
 
 		$server   = self::server();
-		$response = wp_remote_get( $server . '/check/' . self::SLUG, array( 'timeout' => 10, 'headers' => array( 'Accept' => 'application/json' ), 'user-agent' => 'WP-MCP-Updater' ) );
+		$response = wp_remote_get( $server . '/check/' . self::SLUG . ( $fresh ? '?fresh=1' : '' ), array( 'timeout' => 10, 'headers' => array( 'Accept' => 'application/json' ), 'user-agent' => 'WP-MCP-Updater' ) );
 		$data     = is_wp_error( $response ) || 200 !== wp_remote_retrieve_response_code( $response ) ? null : json_decode( wp_remote_retrieve_body( $response ), true );
 
 		$version = is_array( $data ) && ! empty( $data['version'] ) && is_string( $data['version'] ) ? $data['version'] : '';
@@ -79,11 +79,12 @@ class WPMCP_Updater {
 	 */
 	public function check_now() {
 		delete_site_transient( self::CACHE );
-		$release = $this->release();
+		do_action( 'wpmcp_update_check_now' ); // The add-on follows, so one click refreshes both plugins.
+		$release = $this->release( true ); // Asks the update server to skip its own cache: the button must show a release made a moment ago.
 		if ( ! $release ) { return array( 'result' => 'error', 'version' => '' ); }
-		if ( ! version_compare( $release['version'], WPMCP_VERSION, '>' ) ) { return array( 'result' => 'current', 'version' => WPMCP_VERSION ); }
 		delete_site_transient( 'update_plugins' );
 		wp_update_plugins();
+		if ( ! version_compare( $release['version'], WPMCP_VERSION, '>' ) ) { return array( 'result' => 'current', 'version' => WPMCP_VERSION ); }
 		return array( 'result' => 'available', 'version' => $release['version'] );
 	}
 
