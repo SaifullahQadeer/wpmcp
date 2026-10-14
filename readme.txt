@@ -3,7 +3,7 @@ Author: Saifullah Qadeer
 Requires at least: 5.6
 Requires PHP: 7.4
 Tested with Elementor: 4.x
-Stable tag: 1.0.7
+Stable tag: 1.0.8
 License: GPL-2.0-or-later
 
 Turns a WordPress site into its own remote MCP server, so Claude (web, Desktop,
@@ -106,6 +106,10 @@ The admin screen bundles the Inter typeface (SIL Open Font License 1.1, see
 assets/fonts/Inter-LICENSE.txt). Nothing is loaded from external servers.
 
 == Changelog ==
+
+= 1.0.8 =
+* New: choose what happens to WP MCP's data when you delete the plugin. When you deactivate WP MCP you are asked whether to keep its data (the default) or delete it with the plugin. The same switch is under Security. Data means the API key, connected apps, change history and settings.
+* Assistants are now told why a tool is missing, such as the plan or the app's access level, so they can tell you what to change instead of saying they cannot reach plugins or themes.
 
 = 1.0.7 =
 * Fixed: after an update, the Plugins screen still offered the version you had just installed, so you had to update again. It no longer does, and the notice that follows Check for updates says up to date once you have the new version.

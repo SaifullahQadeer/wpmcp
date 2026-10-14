@@ -91,7 +91,7 @@ class WPMCP_Admin {
 			update_option( 'wpmcp_api_key', WPMCP_Auth::generate_key(), false );
 			$message = 'Key rotated. Update the key in each client that uses it.';
 		} elseif ( 'save' === $action ) {
-			foreach ( array( 'enabled', 'oauth_enabled', 'allow_url_key' ) as $setting ) {
+			foreach ( array( 'enabled', 'oauth_enabled', 'allow_url_key', 'delete_data' ) as $setting ) {
 				update_option( 'wpmcp_' . $setting, isset( $_POST[ 'wpmcp_' . $setting ] ) ? '1' : '0' );
 			}
 			do_action( 'wpmcp_save_settings' ); // The Pro add-on saves its own switches here. The nonce and capability were checked above.
@@ -391,6 +391,9 @@ class WPMCP_Admin {
 		<div class="wpmcp-select-row"><label for="wpmcp_key_level"><strong>Access for the API key</strong><small>What an app using the API key may do. Apps that sign in with OAuth get their own access level when you approve them.</small></label><select id="wpmcp_key_level" name="wpmcp_key_level"><?php foreach ( WPMCP_Permissions::levels() as $level_id => $info ) : ?><option value="<?php echo esc_attr( $level_id ); ?>"<?php echo WPMCP_Permissions::normalize( get_option( 'wpmcp_key_level', 'full' ) ) === $level_id ? ' selected' : ''; ?>><?php echo esc_html( $info[0] ); ?></option><?php endforeach; ?></select></div>
 		</section>
 		<?php do_action( 'wpmcp_security_panels', $this ); ?>
+		<section class="wpmcp-panel"><div class="wpmcp-panel-head"><h2><?php echo $this->icon( 'system' ); ?>When the plugin is deleted</h2><p>WordPress asks nothing when a plugin is deleted, so choose here. You are also asked when you deactivate WP MCP.</p></div>
+		<?php $this->toggle( 'delete_data', 'Delete all WP MCP data when the plugin is deleted', 'Removes the API key, connected apps, change history and settings. Leave it off to keep them for a later install.', '0' ); ?>
+		</section>
 		<div class="wpmcp-save"><button class="button button-primary button-hero">Save settings</button></div>
 		</form>
 

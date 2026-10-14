@@ -1,0 +1,15 @@
+/* The question asked when WP MCP is deactivated: keep its data or delete it with the plugin. */
+.wpmcp-modal-back { position: fixed; inset: 0; z-index: 100100; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(20, 22, 26, .55); }
+.wpmcp-modal { box-sizing: border-box; width: 100%; max-width: 460px; padding: 24px; background: #fff; border-radius: 16px; box-shadow: 0 20px 50px rgba(20, 22, 26, .3); color: #14161a; }
+.wpmcp-modal h2 { margin: 0 0 8px; font-size: 18px; font-weight: 700; color: #14161a; }
+.wpmcp-modal p { margin: 0 0 16px; color: #5d646d; font-size: 14px; line-height: 1.5; }
+.wpmcp-modal-choice { display: flex; gap: 10px; align-items: flex-start; margin: 0 0 8px; padding: 12px; border: 1.5px solid #e8e3da; border-radius: 10px; cursor: pointer; }
+.wpmcp-modal-choice:has( input:checked ) { border-color: #14161a; }
+.wpmcp-modal-choice input { margin: 3px 0 0; }
+.wpmcp-modal-choice strong { display: block; font-weight: 600; }
+.wpmcp-modal-choice small { display: block; margin-top: 2px; color: #5d646d; font-size: 13px; }
+.wpmcp-modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+.wpmcp-modal .button { border-radius: 10px; }
+.wpmcp-modal .button-primary { background: #ee4d2b; border-color: #ee4d2b; color: #fff; }
+.wpmcp-modal .button-primary:hover, .wpmcp-modal .button-primary:focus { background: #d63f1f; border-color: #d63f1f; color: #fff; }
+.wpmcp-modal .button-primary:focus-visible, .wpmcp-modal input:focus-visible { outline: 2px solid #ee4d2b; outline-offset: 2px; box-shadow: none; }

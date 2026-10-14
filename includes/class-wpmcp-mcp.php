@@ -337,7 +337,23 @@ class WPMCP_MCP {
 			. "Call wp_ping first: it reports the Elementor version and editor generation (v3 classic vs v4 atomic).\n"
 			. "Every change you make is recorded; wp_list_history shows it.\n"
 			. "Check a page's \"builder\" (from wp_get_content or wp_ping) before editing it. Elementor pages: read them with wp_get_elementor (summary=true first, then index=N for one section) and change words with wp_edit_elementor_text; classic pages use wp_update_content. Only post and page content is managed here unless the WP MCP Pro add-on is active; anything the site's plan does not include is refused with an explanation, so do not retry it.";
+		$note = $this->access_note();
+		if ( '' !== $note ) { $text .= "\n" . $note; }
 		return apply_filters( 'wpmcp_instructions', $text );
+	}
+
+	/**
+	 * Tools the plan or this connection's access level do not allow are not listed, so an assistant asked to install a theme
+	 * would only say it cannot. This tells it why, and what the owner changes, so it can pass that on.
+	 */
+	private function access_note() {
+		if ( ! WPMCP_Plans::at_least( 'pro' ) ) {
+			return 'Tools that the site\'s plan (' . WPMCP_Plans::label( WPMCP_Plans::current() ) . ') does not include are not listed. If the user asks for something you find no tool for (installing or editing plugins and themes, site settings, deleting or undoing, WooCommerce, ACF, custom post types, page layouts or blocks), tell them it needs a higher WP MCP plan (Plus for layouts and blocks, Pro for the rest) instead of saying the site cannot be changed.';
+		}
+		if ( 'full' !== WPMCP_Auth::$level ) {
+			return 'This connection has "' . WPMCP_Permissions::label( WPMCP_Auth::$level ) . '" access, so tools that delete, undo, change site settings or touch plugins, themes and code are not listed. If the user asks for one, tell them to raise this app to Full access in WP MCP > Connect > Connected apps, then reconnect or start a new chat.';
+		}
+		return '';
 	}
 
 	/**

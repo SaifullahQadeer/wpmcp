@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       WP MCP
  * Description:       Turns this WordPress site into its own remote MCP server so Claude, Gemini or any MCP client can manage posts, pages and media, and change text on Elementor pages. Plus and Pro plans add full page-builder, WooCommerce and ACF support through the WP MCP Pro add-on.
- * Version:           1.0.7
+ * Version:           1.0.8
  * Author:            Saifullah Qadeer
  * License:           GPL-2.0-or-later
  * Text Domain:       wpmcp
@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // No direct access.
 }
 
-define( 'WPMCP_VERSION', '1.0.7' );
+define( 'WPMCP_VERSION', '1.0.8' );
 define( 'WPMCP_NAMESPACE', 'wpmcp/v1' );
 define( 'WPMCP_PLUGIN_FILE', __FILE__ );
 define( 'WPMCP_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
@@ -40,6 +40,7 @@ require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-core.php';
 require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-rest.php';
 require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-mcp.php';
 require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-admin.php';
+require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-uninstall.php';
 require_once WPMCP_PLUGIN_DIR . 'includes/class-wpmcp-updater.php';
 
 /**
@@ -71,6 +72,7 @@ function wpmcp_init() {
 	( new WPMCP_Updater() )->register_hooks(); // Not admin-only: scheduled update checks run in cron.
 	if ( is_admin() ) {
 		( new WPMCP_Admin() )->register_hooks();
+		WPMCP_Uninstall::register_hooks();
 	}
 }
 add_action( 'plugins_loaded', 'wpmcp_init' );
