@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       WP MCP
  * Description:       Turns this WordPress site into its own remote MCP server so Claude, Gemini or any MCP client can manage posts, pages and media, and change text on Elementor pages. Plus and Pro plans add full page-builder, WooCommerce and ACF support through the WP MCP Pro add-on.
- * Version:           1.0.6
+ * Version:           1.0.7
  * Author:            Saifullah Qadeer
  * License:           GPL-2.0-or-later
  * Text Domain:       wpmcp
@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // No direct access.
 }
 
-define( 'WPMCP_VERSION', '1.0.6' );
+define( 'WPMCP_VERSION', '1.0.7' );
 define( 'WPMCP_NAMESPACE', 'wpmcp/v1' );
 define( 'WPMCP_PLUGIN_FILE', __FILE__ );
 define( 'WPMCP_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );

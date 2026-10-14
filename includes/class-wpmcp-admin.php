@@ -31,6 +31,7 @@ class WPMCP_Admin {
 		if ( ! isset( $_GET['wpmcp_update_result'] ) || ! current_user_can( 'update_plugins' ) ) { return ''; }
 		$version = isset( $_GET['wpmcp_update_version'] ) ? preg_replace( '/[^0-9A-Za-z.-]/', '', wp_unslash( $_GET['wpmcp_update_version'] ) ) : '';
 		$result  = sanitize_key( wp_unslash( $_GET['wpmcp_update_result'] ) );
+		if ( 'available' === $result && '' !== $version && version_compare( $version, WPMCP_VERSION, '<=' ) ) { $result = 'current'; $version = WPMCP_VERSION; } // Already updated: the address still carries the old answer.
 		if ( 'available' === $result ) { $class = 'notice-warning'; $text = 'WP MCP ' . $version . ' is available. Use the Update now link on the WP MCP row of the Plugins screen.'; }
 		elseif ( 'current' === $result ) { $class = 'notice-success'; $text = 'WP MCP is up to date (version ' . $version . ').'; }
 		else { $class = 'notice-error'; $text = 'Could not reach the update server to check for updates. Try again in a few minutes.'; }

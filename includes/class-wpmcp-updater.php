@@ -88,10 +88,21 @@ class WPMCP_Updater {
 		return array( 'result' => 'available', 'version' => $release['version'] );
 	}
 
+	/**
+	 * The version of the files on disk. WordPress rebuilds its update list right after an update, while the OLD code is
+	 * still running, so WPMCP_VERSION is then the old number: comparing with it put the release just installed back on
+	 * the list ("update available" for the version you already have, until you updated again). The list's own record of
+	 * the installed versions comes from the files, so it is used first.
+	 */
+	private function installed_version( $transient ) {
+		$checked = isset( $transient->checked[ $this->basename ] ) ? $transient->checked[ $this->basename ] : '';
+		return is_string( $checked ) && '' !== $checked ? $checked : WPMCP_VERSION;
+	}
+
 	public function inject_update( $transient ) {
 		if ( ! is_object( $transient ) ) { return $transient; }
 		$release = $this->release();
-		if ( ! $release || '' === $release['package'] || ! version_compare( $release['version'], WPMCP_VERSION, '>' ) ) { return $transient; }
+		if ( ! $release || '' === $release['package'] || ! version_compare( $release['version'], $this->installed_version( $transient ), '>' ) ) { return $transient; }
 		if ( ! isset( $transient->response ) || ! is_array( $transient->response ) ) { $transient->response = array(); }
 		$transient->response[ $this->basename ] = (object) array(
 			'id'          => 'updates.wpmcp.co/' . $this->slug,
