@@ -15,6 +15,7 @@ class WPMCP_OAuth {
 	const REQUEST_TTL   = 600;
 	const ACCESS_TTL    = 3600;
 	const REFRESH_IDLE  = 7776000; // 90 days without use.
+	const REFRESH_GRACE = 120;     // A replaced refresh token still works this long, for a lost answer or a parallel refresh.
 	const MAX_CLIENTS   = 100;
 	const MAX_FAILURES  = 30;
 	const PAGE          = 'wpmcp-authorize';
@@ -426,11 +427,14 @@ class WPMCP_OAuth {
 			$grant_id = get_option( $rt_key, '' );
 			$grants  = self::grants();
 			$grant   = is_string( $grant_id ) && isset( $grants[ $grant_id ] ) ? $grants[ $grant_id ] : null;
-			if ( ! $grant || $grant['client_id'] !== $client_id || $grant['last_used'] < time() - self::REFRESH_IDLE ) {
+			// Rotation retires the token used, but not at once: if the answer never reaches the app, or two requests refresh together,
+			// the app would be left holding a dead token while the site still lists it as connected.
+			$retired = $grant && isset( $grant['old_refresh'][ $rt_key ] ) ? (int) $grant['old_refresh'][ $rt_key ] : 0;
+			if ( $retired && $retired < time() ) { delete_option( $rt_key ); }
+			if ( ! $grant || $grant['client_id'] !== $client_id || $grant['last_used'] < time() - self::REFRESH_IDLE || ( $retired && $retired < time() ) ) {
 				self::note_failure();
 				return self::oauth_error( 400, 'invalid_grant', 'The refresh token is invalid or expired. Connect again.' );
 			}
-			delete_option( $rt_key );
 			return array( 200, self::issue_tokens( $grant_id, $client_id, $grant['client_name'], (int) $grant['user_id'], false ) );
 		}
 
@@ -444,6 +448,15 @@ class WPMCP_OAuth {
 		$refresh = 'wpmcp_rt_' . self::random( 24 );
 		set_transient( 'wpmcp_at_' . self::digest( $access ), array( 'grant' => $grant_id, 'user_id' => $user_id ), self::ACCESS_TTL );
 		update_option( 'wpmcp_rt_' . self::digest( $refresh ), $grant_id, false );
+		$old = array();
+		if ( ! $new ) { // Tokens replaced by this one work for a short grace period and then go; the list stays short.
+			$old     = isset( $grants[ $grant_id ]['old_refresh'] ) && is_array( $grants[ $grant_id ]['old_refresh'] ) ? $grants[ $grant_id ]['old_refresh'] : array();
+			$current = isset( $grants[ $grant_id ]['refresh_key'] ) ? (string) $grants[ $grant_id ]['refresh_key'] : '';
+			if ( '' !== $current && ! isset( $old[ $current ] ) ) { $old[ $current ] = time() + self::REFRESH_GRACE; }
+			foreach ( $old as $key => $until ) { if ( $until < time() ) { delete_option( $key ); unset( $old[ $key ] ); } }
+			asort( $old );
+			while ( count( $old ) > 4 ) { $oldest = array_key_first( $old ); delete_option( $oldest ); unset( $old[ $oldest ] ); }
+		}
 		$grants[ $grant_id ] = array(
 			'client_id'    => $client_id,
 			'client_name'  => $client_name,
@@ -452,6 +465,7 @@ class WPMCP_OAuth {
 			'last_used'    => time(),
 			'level'        => $new ? WPMCP_Permissions::normalize( $level ) : ( isset( $grants[ $grant_id ]['level'] ) ? $grants[ $grant_id ]['level'] : 'full' ),
 			'refresh_key'  => 'wpmcp_rt_' . self::digest( $refresh ),
+			'old_refresh'  => $old,
 		);
 		self::save_grants( $grants );
 		return array( 'access_token' => $access, 'token_type' => 'Bearer', 'expires_in' => self::ACCESS_TTL, 'refresh_token' => $refresh, 'scope' => self::SCOPE );
@@ -505,6 +519,7 @@ class WPMCP_OAuth {
 		$grants = self::grants();
 		if ( ! isset( $grants[ $grant_id ] ) ) { return false; }
 		if ( ! empty( $grants[ $grant_id ]['refresh_key'] ) ) { delete_option( $grants[ $grant_id ]['refresh_key'] ); }
+		if ( ! empty( $grants[ $grant_id ]['old_refresh'] ) && is_array( $grants[ $grant_id ]['old_refresh'] ) ) { foreach ( array_keys( $grants[ $grant_id ]['old_refresh'] ) as $old_key ) { delete_option( $old_key ); } }
 		unset( $grants[ $grant_id ] );
 		self::save_grants( $grants ); // Access tokens die at once: they require a live grant.
 		return true;
