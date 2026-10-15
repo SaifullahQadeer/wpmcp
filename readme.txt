@@ -3,7 +3,7 @@ Author: Saifullah Qadeer
 Requires at least: 5.6
 Requires PHP: 7.4
 Tested with Elementor: 4.x
-Stable tag: 1.0.9
+Stable tag: 1.0.10
 License: GPL-2.0-or-later
 
 Turns a WordPress site into its own remote MCP server, so Claude (web, Desktop,
@@ -106,6 +106,9 @@ The admin screen bundles the Inter typeface (SIL Open Font License 1.1, see
 assets/fonts/Inter-LICENSE.txt). Nothing is loaded from external servers.
 
 == Changelog ==
+
+= 1.0.10 =
+* Two new Plus tools for building with Elementor: an Elementor building guide that tells an assistant the exact settings of the widgets it will use, read from your own Elementor, and a tool that creates Elementor templates (headers, footers and more) as drafts.
 
 = 1.0.9 =
 * wp_ping now tells assistants what an Elementor site is built from: the theme and its parent, the container width, the global colors and fonts, the header and footer templates, and the widgets this Elementor has. Assistants use it to build things that match the site.

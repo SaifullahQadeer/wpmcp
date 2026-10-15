@@ -15,7 +15,7 @@ class WPMCP_Plans {
 	/** Tool groups that need a paid plan: label => array( plan, tool names ). */
 	public static function groups() {
 		return array(
-			'Elementor layouts and styles' => array( 'plus', array( 'wp_set_elementor', 'wp_elementor_globals' ) ),
+			'Elementor layouts and styles' => array( 'plus', array( 'wp_set_elementor', 'wp_elementor_globals', 'wp_elementor_guide', 'wp_elementor_template' ) ),
 			'Block editor (Gutenberg)'     => array( 'plus', array( 'wp_list_block_types', 'wp_get_blocks', 'wp_set_blocks' ) ),
 			'Divi'                         => array( 'plus', array( 'wp_get_divi', 'wp_set_divi' ) ),
 			'Caches'                       => array( 'plus', array( 'wp_clear_cache' ) ),
