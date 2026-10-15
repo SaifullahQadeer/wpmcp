@@ -116,6 +116,10 @@ class WPMCP_Core {
 		if ( isset( $body['elementor'] ) && ! WPMCP_Plans::allows( 'wp_set_elementor' ) ) {
 			return new WP_Error( 'wpmcp_plan', WPMCP_Plans::upgrade_text( 'plus', 'Writing an Elementor layout' ) . ' To change words on an Elementor page use wp_edit_elementor_text.', array( 'status' => 403 ) );
 		}
+		if ( isset( $body['elementor'] ) ) { // The Pro add-on checks the layout against this Elementor before anything is saved.
+			$layout = apply_filters( 'wpmcp_layout', self::layout_from( $body['elementor'] ) );
+			if ( is_wp_error( $layout ) ) { return $layout; }
+		}
 		if ( isset( $body['acf'] ) && ! WPMCP_Plans::allows( 'wp_acf_set_values' ) ) {
 			return new WP_Error( 'wpmcp_plan', WPMCP_Plans::upgrade_text( 'pro', 'Saving ACF field values' ), array( 'status' => 403 ) );
 		}
@@ -128,6 +132,11 @@ class WPMCP_Core {
 			}
 		}
 		return null;
+	}
+
+	/** The element list of an "elementor" argument, which may be the list itself or an object holding it. */
+	private static function layout_from( $value ) {
+		return is_array( $value ) && isset( $value['elements'] ) ? $value['elements'] : $value;
 	}
 
 	/** Saves featured image, meta, terms and the Elementor tree, then lets the Pro add-on save its extras (ACF). Returns their results by name. */
@@ -146,11 +155,8 @@ class WPMCP_Core {
 			}
 		}
 		if ( isset( $body['elementor'] ) ) {
-			$elements = $body['elementor'];
-			if ( is_array( $elements ) && isset( $elements['elements'] ) ) {
-				$elements = $elements['elements'];
-			}
-			WPMCP_Elementor::set_data( $post_id, $elements );
+			$elements = apply_filters( 'wpmcp_layout', self::layout_from( $body['elementor'] ) ); // Normalised (ids) by the add-on's check.
+			WPMCP_Elementor::set_data( $post_id, is_wp_error( $elements ) ? self::layout_from( $body['elementor'] ) : $elements );
 		}
 		return (array) apply_filters( 'wpmcp_post_extras', array(), $post_id, $body );
 	}
@@ -217,6 +223,7 @@ class WPMCP_Core {
 			'max_result_chars'   => (int) apply_filters( 'wpmcp_max_result_chars', WPMCP_MAX_RESULT_CHARS ),
 			'post_types'         => $types,
 		);
+		if ( $out['elementor_active'] ) { $out['elementor_site'] = WPMCP_Elementor::profile(); }
 		return apply_filters( 'wpmcp_ping', $out );
 	}
 

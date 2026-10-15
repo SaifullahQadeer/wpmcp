@@ -61,6 +61,74 @@ class WPMCP_Elementor {
 	}
 
 	/**
+	 * What an assistant needs to build something that fits this site: the theme (and its parent), the container width,
+	 * the global colors and fonts, the header and footer templates that exist, and the widgets and element types this
+	 * Elementor really has. Everything is read, nothing is changed, and each part is skipped when Elementor does not
+	 * offer it, so this can never break wp_ping.
+	 *
+	 * @return array
+	 */
+	public static function profile() {
+		$out = array( 'theme' => self::theme_info() );
+		if ( ! self::is_active() ) { return $out; }
+
+		$kit_id   = (int) get_option( 'elementor_active_kit', 0 );
+		$settings = $kit_id ? get_post_meta( $kit_id, '_elementor_page_settings', true ) : array();
+		$settings = is_array( $settings ) ? $settings : array();
+		$out['kit_id'] = $kit_id;
+
+		if ( isset( $settings['container_width']['size'] ) ) {
+			$out['container_width'] = array( 'size' => $settings['container_width']['size'], 'unit' => isset( $settings['container_width']['unit'] ) ? $settings['container_width']['unit'] : 'px' );
+		}
+		$out['global_colors'] = array();
+		foreach ( array( 'system_colors', 'custom_colors' ) as $group ) {
+			foreach ( ( isset( $settings[ $group ] ) && is_array( $settings[ $group ] ) ? $settings[ $group ] : array() ) as $item ) {
+				if ( isset( $item['_id'], $item['color'] ) ) { $out['global_colors'][] = array( 'id' => (string) $item['_id'], 'title' => isset( $item['title'] ) ? (string) $item['title'] : '', 'color' => (string) $item['color'], 'ref' => 'globals/colors?id=' . $item['_id'] ); }
+			}
+		}
+		$out['global_fonts'] = array();
+		foreach ( array( 'system_typography', 'custom_typography' ) as $group ) {
+			foreach ( ( isset( $settings[ $group ] ) && is_array( $settings[ $group ] ) ? $settings[ $group ] : array() ) as $item ) {
+				if ( isset( $item['_id'] ) ) { $out['global_fonts'][] = array( 'id' => (string) $item['_id'], 'title' => isset( $item['title'] ) ? (string) $item['title'] : '', 'font_family' => isset( $item['typography_font_family'] ) ? (string) $item['typography_font_family'] : '', 'ref' => 'globals/typography?id=' . $item['_id'] ); }
+			}
+		}
+
+		$out['templates'] = array();
+		foreach ( get_posts( array( 'post_type' => 'elementor_library', 'post_status' => array( 'publish', 'draft', 'private' ), 'posts_per_page' => 50, 'orderby' => 'ID', 'order' => 'ASC', 'suppress_filters' => true ) ) as $tpl ) {
+			$type = (string) get_post_meta( $tpl->ID, '_elementor_template_type', true );
+			if ( '' === $type || 'kit' === $type ) { continue; }
+			$conditions = get_post_meta( $tpl->ID, '_elementor_conditions', true );
+			$out['templates'][] = array( 'id' => (int) $tpl->ID, 'title' => (string) $tpl->post_title, 'type' => $type, 'status' => (string) $tpl->post_status, 'conditions' => is_array( $conditions ) ? array_values( array_map( 'strval', $conditions ) ) : array() );
+		}
+
+		$out['widgets']       = array();
+		$out['element_types'] = array();
+		if ( class_exists( '\\Elementor\\Plugin' ) && isset( \Elementor\Plugin::$instance ) ) {
+			try {
+				$plugin = \Elementor\Plugin::$instance;
+				if ( isset( $plugin->widgets_manager ) ) { $out['widgets'] = array_map( 'strval', array_keys( (array) $plugin->widgets_manager->get_widget_types() ) ); sort( $out['widgets'] ); }
+				if ( isset( $plugin->elements_manager ) ) { $out['element_types'] = array_map( 'strval', array_keys( (array) $plugin->elements_manager->get_element_types() ) ); sort( $out['element_types'] ); }
+			} catch ( \Throwable $e ) { // The lists stay empty and nothing is checked against them.
+				$out['widgets'] = array(); $out['element_types'] = array();
+			}
+		}
+		$out['how_to_use'] = 'Use the site\'s container width (leave a boxed container\'s width unset). Reference a global color or font in an element\'s __globals__ as its "ref" instead of a hard-coded value. Use only the widgets and element types listed here.';
+		return $out;
+	}
+
+	/** The active theme, and the parent when a child theme is active (edit the child, never the parent). */
+	public static function theme_info() {
+		$theme  = wp_get_theme();
+		$parent = $theme->parent();
+		return array(
+			'name'       => (string) $theme->get( 'Name' ),
+			'stylesheet' => (string) $theme->get_stylesheet(),
+			'is_child'   => (bool) $parent,
+			'parent'     => $parent ? array( 'name' => (string) $parent->get( 'Name' ), 'stylesheet' => (string) $parent->get_stylesheet() ) : null,
+		);
+	}
+
+	/**
 	 * Get the Elementor data (decoded array) for a post.
 	 *
 	 * @param int $post_id Post ID.

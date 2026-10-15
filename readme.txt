@@ -3,7 +3,7 @@ Author: Saifullah Qadeer
 Requires at least: 5.6
 Requires PHP: 7.4
 Tested with Elementor: 4.x
-Stable tag: 1.0.8
+Stable tag: 1.0.9
 License: GPL-2.0-or-later
 
 Turns a WordPress site into its own remote MCP server, so Claude (web, Desktop,
@@ -106,6 +106,9 @@ The admin screen bundles the Inter typeface (SIL Open Font License 1.1, see
 assets/fonts/Inter-LICENSE.txt). Nothing is loaded from external servers.
 
 == Changelog ==
+
+= 1.0.9 =
+* wp_ping now tells assistants what an Elementor site is built from: the theme and its parent, the container width, the global colors and fonts, the header and footer templates, and the widgets this Elementor has. Assistants use it to build things that match the site.
 
 = 1.0.8 =
 * New: choose what happens to WP MCP's data when you delete the plugin. When you deactivate WP MCP you are asked whether to keep its data (the default) or delete it with the plugin. The same switch is under Security. Data means the API key, connected apps, change history and settings.

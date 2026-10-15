@@ -348,7 +348,9 @@ class WPMCP_MCP {
 	 */
 	private function access_note() {
 		if ( ! WPMCP_Plans::at_least( 'pro' ) ) {
-			return 'Tools that the site\'s plan (' . WPMCP_Plans::label( WPMCP_Plans::current() ) . ') does not include are not listed. If the user asks for something you find no tool for (installing or editing plugins and themes, site settings, deleting or undoing, WooCommerce, ACF, custom post types, page layouts or blocks), tell them it needs a higher WP MCP plan (Plus for layouts and blocks, Pro for the rest) instead of saying the site cannot be changed.';
+			$note = 'Tools that the site\'s plan (' . WPMCP_Plans::label( WPMCP_Plans::current() ) . ') does not include are not listed. If the user asks for something you find no tool for (installing or editing plugins and themes, site settings, deleting or undoing, WooCommerce, ACF, custom post types, page layouts or blocks), tell them it needs a higher WP MCP plan (Plus for layouts and blocks, Pro for the rest) instead of saying the site cannot be changed.';
+			if ( WPMCP_Plans::at_least( 'plus' ) && 'full' !== WPMCP_Auth::$level ) { $note .= ' Adding global colors and fonts to Elementor needs Full access for this connection: tell the user to raise this app to Full access in WP MCP > Connect > Connected apps.'; }
+			return $note;
 		}
 		if ( 'full' !== WPMCP_Auth::$level ) {
 			return 'This connection has "' . WPMCP_Permissions::label( WPMCP_Auth::$level ) . '" access, so tools that delete, undo, change site settings or touch plugins, themes and code are not listed. If the user asks for one, tell them to raise this app to Full access in WP MCP > Connect > Connected apps, then reconnect or start a new chat.';
