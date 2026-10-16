@@ -94,16 +94,29 @@ class WPMCP_OAuth {
 	public static function serve_well_known() {
 		if ( ! self::enabled() || ! isset( $_SERVER['REQUEST_URI'], $_SERVER['REQUEST_METHOD'] ) || ! in_array( $_SERVER['REQUEST_METHOD'], array( 'GET', 'HEAD' ), true ) ) { return; }
 		$path = wp_parse_url( wp_unslash( $_SERVER['REQUEST_URI'] ), PHP_URL_PATH );
-		if ( ! is_string( $path ) || false === strpos( $path, '/.well-known/' ) ) { return; }
-		// The bare address at the site root is what older clients ask for: it keeps the site address as issuer. With a path after it, the path issuer.
-		$bare = (bool) preg_match( '#/\.well-known/[a-z-]+/?$#', $path );
-		if ( preg_match( '#/\.well-known/oauth-authorization-server(?:/|$)#', $path ) ) { $doc = self::server_metadata( $bare ? self::root_issuer() : '' ); }
-		elseif ( preg_match( '#/\.well-known/openid-configuration(?:/|$)#', $path ) ) { $doc = self::openid_metadata( $bare ? self::root_issuer() : '' ); }
-		elseif ( preg_match( '#/\.well-known/oauth-protected-resource(?:/|$)#', $path ) ) { $doc = self::resource_metadata(); }
-		else { return; }
+		$doc  = self::well_known_document( $path );
+		if ( null === $doc ) { return; }
 		self::no_cache();
 		header( 'Access-Control-Allow-Origin: *' );
 		wp_send_json( $doc );
+	}
+
+	/**
+	 * The discovery document for a request path, or null when the path is not one of ours.
+	 *
+	 * Only the bare address at the site root (/.well-known/oauth-authorization-server, what older clients ask for) keeps the
+	 * site address as issuer. Every other form, including the one under the REST address (.../oauth/.well-known/...), must
+	 * carry the path issuer: that is the issuer the resource document names and the one sent back in the redirect, and a
+	 * client refuses a document whose issuer differs from the one it was told about.
+	 */
+	public static function well_known_document( $path ) {
+		if ( ! is_string( $path ) || false === strpos( $path, '/.well-known/' ) ) { return null; }
+		$base = untrailingslashit( (string) wp_parse_url( home_url(), PHP_URL_PATH ) ) . '/.well-known/';
+		$bare = 0 === strpos( $path, $base ) && (bool) preg_match( '#^[a-z-]+/?$#', substr( $path, strlen( $base ) ) );
+		if ( preg_match( '#/\.well-known/oauth-authorization-server(?:/|$)#', $path ) ) { return self::server_metadata( $bare ? self::root_issuer() : '' ); }
+		if ( preg_match( '#/\.well-known/openid-configuration(?:/|$)#', $path ) ) { return self::openid_metadata( $bare ? self::root_issuer() : '' ); }
+		if ( preg_match( '#/\.well-known/oauth-protected-resource(?:/|$)#', $path ) ) { return self::resource_metadata(); }
+		return null;
 	}
 
 	/**
