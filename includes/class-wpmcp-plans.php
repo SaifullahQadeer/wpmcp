@@ -27,6 +27,7 @@ class WPMCP_Plans {
 			'Advanced Custom Fields'       => array( 'pro', array( 'wp_acf_list', 'wp_acf_save_post_type', 'wp_acf_save_taxonomy', 'wp_acf_save_field_group', 'wp_acf_delete', 'wp_acf_get_values', 'wp_acf_set_values' ) ),
 			'Delete, undo and settings'    => array( 'pro', array( 'wp_delete_content', 'wp_rollback', 'wp_get_settings', 'wp_update_settings' ) ),
 			'Plugins & themes'             => array( 'pro', array( 'wp_list_extensions', 'wp_install_extension', 'wp_list_extension_files', 'wp_read_extension_file', 'wp_edit_extension_file', 'wp_list_file_backups', 'wp_restore_extension_file', 'wp_set_extension_active' ) ),
+			'Theme staging'                => array( 'pro', array( 'wp_stage_create', 'wp_stage_list', 'wp_stage_read', 'wp_stage_write', 'wp_stage_diff', 'wp_stage_publish', 'wp_stage_discard' ) ),
 		);
 	}
 
